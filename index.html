@@ -125,6 +125,33 @@
   .qr-block{margin-bottom:16px;}
   .qr-block:last-child{margin-bottom:0;}
   .qr-label{font-size:12px; color:var(--muted); margin-bottom:6px;}
+  .bank-badge{font-weight:700; font-size:14px; color:var(--gold-l);}
+  #screen-terminal{padding-bottom:78px;}
+  .tabbar{position:fixed; left:0; right:0; bottom:0; display:flex; max-width:480px; margin:0 auto;
+    background:var(--card); border-top:1px solid var(--border); padding-bottom:env(safe-area-inset-bottom);}
+  .tabbtn{flex:1; text-align:center; padding:11px 0 9px; color:var(--muted); font-size:12px; cursor:pointer;}
+  .tabbtn.active{color:var(--gold-l);}
+  .tabbtn-icon{display:block; font-size:20px; margin-bottom:2px;}
+  .op-player-row{display:flex; justify-content:space-between; align-items:center; padding:10px 12px;
+    border-radius:10px; margin-bottom:6px; background:var(--bg); border:1px solid var(--border); cursor:pointer;}
+  .op-player-row.selected{border-color:var(--gold-l); background:var(--card2);}
+  /* Carteira do jogador */
+  .wallet-card{background:linear-gradient(135deg,#1a3524,#0d1b12); border:1px solid var(--border);
+    border-radius:20px; padding:24px 22px; position:relative; overflow:hidden; margin-bottom:16px;}
+  .wallet-card::before{content:""; position:absolute; top:-40px; right:-40px; width:140px; height:140px;
+    border-radius:50%; background:radial-gradient(circle, rgba(255,217,61,.15), transparent 70%);}
+  .wallet-card-brand{font-size:12px; letter-spacing:1.5px; color:var(--gold-l); font-weight:700; text-transform:uppercase;}
+  .wallet-card-chip{font-size:26px; margin:16px 0 6px;}
+  .wallet-card-balance{font-size:36px; font-weight:800; color:#fff; margin:2px 0 14px;}
+  .wallet-card-name{font-size:14px; color:var(--muted); letter-spacing:.5px;}
+  .action-row{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;}
+  .action-btn{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px 10px;
+    text-align:center; cursor:pointer; transition:transform .08s;}
+  .action-btn:active{transform:scale(.96);}
+  .action-btn-icon{font-size:26px; display:block; margin-bottom:6px;}
+  .action-btn.pay .action-btn-icon{color:var(--red);}
+  .action-btn.receive .action-btn-icon{color:var(--gold-l);}
+  .action-btn-label{font-size:14px; font-weight:700;}
   .boot-status{position:fixed; top:0; left:0; right:0; background:var(--gold); color:#231a00; font-size:12px;
     text-align:center; padding:6px; z-index:999; display:none;}
 </style>
@@ -177,67 +204,93 @@
 
   <div class="screen" id="screen-terminal">
     <div class="topbar">
-      <span class="pill">🏦 Terminal</span>
+      <span class="bank-badge">🏦 Banco Imobiliário</span>
       <span class="pill" id="term-code-pill"></span>
     </div>
-    <div class="card">
-      <div class="qr-block center">
-        <div class="qr-label">QR DE ENTRADA — jogadores escaneiam pra entrar na partida</div>
-        <div id="term-qr-join"></div>
+
+    <div id="term-tab-jogadores" class="term-tab">
+      <div class="card">
+        <div class="qr-block center">
+          <div class="qr-label">QR DE ENTRADA — o jogador escaneia pra se cadastrar na partida</div>
+          <div id="term-qr-join"></div>
+        </div>
       </div>
-      <div class="qr-block center">
-        <div class="qr-label">QR DO BANCO — jogadores escaneiam pra pagar impostos, aluguéis e compras</div>
+      <div class="card">
+        <div class="stat-row">
+          <span>Jogadores ativos: <b id="term-player-count">0</b></span>
+          <span>Caixa em circulação: <b id="term-total-circ">R$ 0</b></span>
+        </div>
+        <b>Jogadores cadastrados</b>
+        <div id="term-players"></div>
+      </div>
+    </div>
+
+    <div id="term-tab-operacao" class="term-tab" style="display:none;">
+      <div class="card center">
+        <div class="qr-label">QR DO BANCO — o jogador escaneia esse QR pra pagar impostos, aluguéis e compras</div>
         <div id="term-qr-pay"></div>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="stat-row">
-        <span>Jogadores ativos: <b id="term-player-count">0</b></span>
-        <span>Caixa em circulação: <b id="term-total-circ">R$ 0</b></span>
+      <div class="card">
+        <b>💰 Pagar / Cobrar de um jogador</b>
+        <p class="sub" style="margin:6px 0 0;">Toque num jogador e depois numa ação.</p>
+        <div id="term-op-target" class="pill" style="margin-top:6px;">Nenhum jogador selecionado</div>
+        <div id="term-op-players" style="margin-top:6px;"></div>
+        <div class="quickbtns" style="margin-top:10px;">
+          <button class="btn btn-gold btn-sm" onclick="quickBankAction(200,'Passou no GO')">💵 Pagar +200 (GO)</button>
+          <button class="btn btn-danger btn-sm" onclick="quickBankAction(-100,'Imposto')">🧾 Cobrar -100 (Imposto)</button>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <input id="term-adjust-amount" type="number" placeholder="Valor (+ paga / - cobra)">
+          <input id="term-adjust-desc" placeholder="Motivo" style="flex:1.4;">
+        </div>
+        <div class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="applyManualAdjust()">Aplicar</div>
       </div>
-      <b>Jogadores</b>
-      <div id="term-players"></div>
-    </div>
 
-    <div class="card">
-      <b>Ações rápidas do banco</b>
-      <p class="sub" style="margin:6px 0 0;">Toque num jogador acima e depois numa ação — pagamentos e cobranças do banco.</p>
-      <div class="quickbtns">
-        <button class="btn btn-gold btn-sm" onclick="quickBankAction(200,'Passou no GO')">Pagar +200 (GO)</button>
-        <button class="btn btn-danger btn-sm" onclick="quickBankAction(-100,'Imposto')">Cobrar -100 (Imposto)</button>
+      <div class="card">
+        <b>📜 Extrato completo da partida</b>
+        <div id="term-log"></div>
       </div>
-      <div id="term-adjust-target" class="pill" style="margin-top:10px;">Nenhum jogador selecionado</div>
-      <div class="row" style="margin-top:8px;">
-        <input id="term-adjust-amount" type="number" placeholder="Valor (+ paga / - cobra)">
-        <input id="term-adjust-desc" placeholder="Motivo" style="flex:1.4;">
+
+      <button class="btn btn-danger btn-sm" style="width:100%;" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
+    </div>
+
+    <div class="tabbar">
+      <div class="tabbtn active" id="tabbtn-jogadores" onclick="switchTermTab('jogadores')">
+        <span class="tabbtn-icon">👥</span><span>Jogadores</span>
       </div>
-      <div class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="applyManualAdjust()">Aplicar</div>
+      <div class="tabbtn" id="tabbtn-operacao" onclick="switchTermTab('operacao')">
+        <span class="tabbtn-icon">💰</span><span>Operação</span>
+      </div>
     </div>
-
-    <div class="card">
-      <b>Extrato completo da partida</b>
-      <div id="term-log"></div>
-    </div>
-
-    <button class="btn btn-danger btn-sm" style="width:100%;" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
   </div>
 
   <div class="screen" id="screen-wallet">
     <div class="topbar">
-      <span class="pill" id="wallet-name-pill">👤</span>
+      <span class="bank-badge">🏦 Banco Imobiliário</span>
       <span class="pill" id="wallet-code-pill"></span>
     </div>
-    <div class="card center">
-      <div style="color:var(--muted);font-size:13px;">Meu saldo</div>
-      <div class="balance" id="wallet-balance">R$ 0</div>
-      <div class="grid2">
-        <div class="btn btn-primary" onclick="openPayFlow()">💸 Pagar</div>
-        <div class="btn btn-gold" onclick="openReceiveFlow()">📥 Receber</div>
+
+    <div class="wallet-card">
+      <div class="wallet-card-brand">Minha Carteira</div>
+      <div class="wallet-card-chip">🪙</div>
+      <div class="wallet-card-balance" id="wallet-balance">R$ 0</div>
+      <div class="wallet-card-name" id="wallet-name-pill">👤</div>
+    </div>
+
+    <div class="action-row">
+      <div class="action-btn pay" onclick="openPayFlow()">
+        <span class="action-btn-icon">💸</span>
+        <span class="action-btn-label">Pagar</span>
+      </div>
+      <div class="action-btn receive" onclick="openReceiveFlow()">
+        <span class="action-btn-icon">📥</span>
+        <span class="action-btn-label">Receber</span>
       </div>
     </div>
+
     <div class="card">
-      <b>Extrato</b>
+      <b>📜 Extrato</b>
       <div id="wallet-log"></div>
     </div>
   </div>
@@ -356,14 +409,21 @@ async function createRoomFlow(){
 
 async function enterTerminal(code){
   showScreen('screen-terminal');
+  switchTermTab('jogadores');
   document.getElementById('term-code-pill').textContent = code;
   document.getElementById('term-qr-join').innerHTML = '';
-  new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+code, width:170, height:170 });
+  new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+code, width:190, height:190 });
   document.getElementById('term-qr-pay').innerHTML = '';
-  new QRCode(document.getElementById('term-qr-pay'), { text: PAY_PREFIX+code+'|BANK', width:130, height:130 });
+  new QRCode(document.getElementById('term-qr-pay'), { text: PAY_PREFIX+code+'|BANK', width:150, height:150 });
   await refreshTerminal();
   clearInterval(pollTimer);
   pollTimer = setInterval(refreshTerminal, 2000);
+}
+function switchTermTab(tab){
+  document.getElementById('term-tab-jogadores').style.display = tab==='jogadores' ? '' : 'none';
+  document.getElementById('term-tab-operacao').style.display = tab==='operacao' ? '' : 'none';
+  document.getElementById('tabbtn-jogadores').classList.toggle('active', tab==='jogadores');
+  document.getElementById('tabbtn-operacao').classList.toggle('active', tab==='operacao');
 }
 let selectedAdjustPlayer = null;
 async function refreshTerminal(){
@@ -376,11 +436,21 @@ async function refreshTerminal(){
   document.getElementById('term-total-circ').textContent = 'R$ ' + totalCirc.toLocaleString('pt-BR');
   const list = document.getElementById('term-players');
   if(room.players.length===0){
-    list.innerHTML = '<div class="empty">Nenhum jogador entrou ainda</div>';
+    list.innerHTML = '<div class="empty">Nenhum jogador entrou ainda — mostre o QR de entrada 👆</div>';
   }else{
     list.innerHTML = room.players.map(p=>`
-      <div class="player-row" onclick="selectAdjustPlayer('${p.id}','${escapeHtml(p.name)}')" style="cursor:pointer; ${selectedAdjustPlayer && selectedAdjustPlayer.id===p.id ? 'background:var(--card2);border-radius:10px;padding-left:8px;padding-right:8px;':''}">
-        <span class="player-name">${escapeHtml(p.name)}</span>
+      <div class="player-row">
+        <span class="player-name">👤 ${escapeHtml(p.name)}</span>
+        <span class="player-bal">R$ ${p.balance.toLocaleString('pt-BR')}</span>
+      </div>`).join('');
+  }
+  const opList = document.getElementById('term-op-players');
+  if(room.players.length===0){
+    opList.innerHTML = '<div class="empty">Cadastre jogadores na aba Jogadores primeiro</div>';
+  }else{
+    opList.innerHTML = room.players.map(p=>`
+      <div class="op-player-row ${selectedAdjustPlayer && selectedAdjustPlayer.id===p.id ? 'selected':''}" onclick="selectAdjustPlayer('${p.id}','${escapeHtml(p.name)}')">
+        <span class="player-name">👤 ${escapeHtml(p.name)}</span>
         <span class="player-bal">R$ ${p.balance.toLocaleString('pt-BR')}</span>
       </div>`).join('');
   }
@@ -394,7 +464,7 @@ async function refreshTerminal(){
 }
 function selectAdjustPlayer(id,name){
   selectedAdjustPlayer = { id, name };
-  document.getElementById('term-adjust-target').textContent = 'Selecionado: ' + name;
+  document.getElementById('term-op-target').textContent = '👉 Selecionado: ' + name;
   refreshTerminal();
 }
 async function quickBankAction(amount, desc){
