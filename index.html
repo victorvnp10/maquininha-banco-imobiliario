@@ -328,7 +328,15 @@
       <video id="scan-video" playsinline muted></video>
       <div class="scan-frame"></div>
     </div>
+    <div class="sub center" id="scan-status" style="margin-top:-8px;"></div>
     <div class="err" id="scan-err"></div>
+    <div id="scan-join-fallback" style="display:none;">
+      <button class="btn btn-outline btn-sm" style="width:100%;" onclick="showScreen('screen-join-intro')">Digitar código da partida em vez disso</button>
+    </div>
+    <div id="scan-pay-fallback" style="display:none;">
+      <button class="btn btn-outline btn-sm" style="width:100%;" onclick="togglePayFallbackList()">Escolher destinatário da lista</button>
+      <div id="pay-fallback-list" style="display:none; margin-top:10px;"></div>
+    </div>
   </div>
 
   <div class="screen" id="screen-receive">
@@ -533,6 +541,8 @@ function beginJoinScan(){
   document.getElementById('scan-title').textContent = 'Escaneie o QR do Banco';
   document.getElementById('scan-sub').textContent = 'Aponte a câmera pro "QR DE ENTRADA" mostrado no terminal.';
   document.getElementById('scan-err').textContent = '';
+  document.getElementById('scan-join-fallback').style.display = '';
+  document.getElementById('scan-pay-fallback').style.display = 'none';
   showScreen('screen-scan');
   startScanner();
 }
@@ -628,8 +638,28 @@ function goToPayScan(){
   document.getElementById('scan-title').textContent = 'Aproxime o QR';
   document.getElementById('scan-sub').textContent = 'Aponte a câmera pro QR de quem vai receber R$ ' + amount.toLocaleString('pt-BR') + '.';
   document.getElementById('scan-err').textContent = '';
+  document.getElementById('scan-join-fallback').style.display = 'none';
+  document.getElementById('scan-pay-fallback').style.display = '';
+  document.getElementById('pay-fallback-list').style.display = 'none';
+  document.getElementById('pay-fallback-list').innerHTML = '';
   showScreen('screen-scan');
   startScanner();
+}
+async function togglePayFallbackList(){
+  const listEl = document.getElementById('pay-fallback-list');
+  if(listEl.style.display !== 'none'){ listEl.style.display = 'none'; return; }
+  const s = getSession();
+  const room = await loadRoom(s.roomCode);
+  if(!room){ listEl.innerHTML = '<div class="empty">Sem conexão. Tente de novo.</div>'; listEl.style.display=''; return; }
+  const others = room.players.filter(p=>p.id!==s.playerId);
+  let html = `<div class="op-player-row" onclick="selectPayFallbackTarget('BANK','Banco')"><span class="player-name">🏦 Banco</span></div>`;
+  html += others.map(p=>`<div class="op-player-row" onclick="selectPayFallbackTarget('${p.id}','${escapeHtml(p.name)}')"><span class="player-name">👤 ${escapeHtml(p.name)}</span></div>`).join('');
+  listEl.innerHTML = html || '<div class="empty">Nenhum outro jogador na partida ainda</div>';
+  listEl.style.display = '';
+}
+async function selectPayFallbackTarget(id, name){
+  stopScanner();
+  await executePayment(id, name, pendingPayAmount);
 }
 async function handlePayScanResult(roomCode, targetId){
   const s = getSession();
@@ -679,27 +709,51 @@ async function executePayment(targetId, targetName, amount){
 }
 
 /* ---------- Generic QR scanner ---------- */
+async function getCameraStream(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    throw new Error('sem suporte a câmera neste navegador (precisa de HTTPS)');
+  }
+  const attempts = [
+    { video: { facingMode: { ideal: 'environment' } } },
+    { video: true }
+  ];
+  let lastErr = null;
+  for(const constraints of attempts){
+    try{ return await navigator.mediaDevices.getUserMedia(constraints); }
+    catch(e){ lastErr = e; }
+  }
+  throw lastErr;
+}
 async function startScanner(){
   const video = document.getElementById('scan-video');
   const errEl = document.getElementById('scan-err');
+  const statusEl = document.getElementById('scan-status');
+  errEl.textContent = '';
+  if(statusEl) statusEl.textContent = 'Carregando câmera…';
   if(typeof jsQR !== 'function'){
-    errEl.textContent = 'Não foi possível carregar o leitor de QR. Use a opção de digitar o código abaixo.';
+    errEl.textContent = 'Não foi possível carregar o leitor de QR (falha ao baixar a biblioteca). Use a opção de digitar o código abaixo, ou recarregue a página.';
+    if(statusEl) statusEl.textContent = '';
     return;
   }
   try{
-    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    scanStream = await getCameraStream();
     video.srcObject = scanStream;
     await video.play();
+    if(statusEl) statusEl.textContent = '🔎 Procurando QR…';
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let frames = 0;
     const tick = () => {
       if(!scanStream) return;
-      if(video.readyState === video.HAVE_ENOUGH_DATA){
+      if(video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0){
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const img = ctx.getImageData(0,0,canvas.width,canvas.height);
         let code = null;
-        try{ code = jsQR(img.data, img.width, img.height); }catch(err){ /* frame ilegível, tenta o próximo */ }
+        try{ code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' }); }
+        catch(err){ /* frame ilegível, tenta o próximo */ }
+        frames++;
+        if(statusEl && frames % 30 === 0) statusEl.textContent = '🔎 Procurando QR… (aproxime e centralize)';
         if(code && code.data){
           if(scanMode==='join' && code.data.startsWith(JOIN_PREFIX)){
             const roomCode = code.data.slice(JOIN_PREFIX.length);
@@ -717,7 +771,15 @@ async function startScanner(){
     };
     scanRAF = requestAnimationFrame(tick);
   }catch(e){
-    errEl.textContent = 'Não foi possível acessar a câmera. Verifique a permissão.';
+    console.error('Câmera falhou', e);
+    if(statusEl) statusEl.textContent = '';
+    if(e && e.name === 'NotAllowedError'){
+      errEl.textContent = 'Permissão de câmera negada. Libere o acesso à câmera nas configurações do navegador/site e tente de novo.';
+    }else if(e && e.name === 'NotFoundError'){
+      errEl.textContent = 'Nenhuma câmera encontrada neste dispositivo.';
+    }else{
+      errEl.textContent = 'Não foi possível acessar a câmera (' + (e && e.message ? e.message : 'erro desconhecido') + '). Use a opção de digitar o código abaixo.';
+    }
   }
 }
 function stopScanner(){
