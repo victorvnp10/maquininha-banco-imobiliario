@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Maquininha — Banco Imobiliário</title>
+<meta name="theme-color" content="#0d1b12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Maquininha">
+<meta name="mobile-web-app-capable" content="yes">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function setupPWA(){
+  const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+    <rect width="512" height="512" rx="96" fill="#0d1b12"/>
+    <rect x="40" y="40" width="432" height="432" rx="64" fill="#1f8a4c"/>
+    <text x="256" y="300" font-size="220" text-anchor="middle" font-family="Arial" fill="#ffd93d">R$</text>
+  </svg>`;
+  const iconUrl = "data:image/svg+xml;base64," + btoa(ICON_SVG);
+  const manifest = {
+    name: "Maquininha Banco Imobiliário",
+    short_name: "Maquininha",
+    start_url: ".",
+    scope: ".",
+    display: "standalone",
+    background_color: "#0d1b12",
+    theme_color: "#0d1b12",
+    orientation: "portrait",
+    icons: [
+      { src: iconUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+      { src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any" }
+    ]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
+  const link = document.createElement("link");
+  link.rel = "manifest";
+  link.href = URL.createObjectURL(manifestBlob);
+  document.head.appendChild(link);
+
+  const appleIcon = document.createElement("link");
+  appleIcon.rel = "apple-touch-icon";
+  appleIcon.href = iconUrl;
+  document.head.appendChild(appleIcon);
+
+  if ("serviceWorker" in navigator) {
+    const swCode = `
+      const CACHE = "maquininha-v1";
+      self.addEventListener("install", e => { self.skipWaiting(); });
+      self.addEventListener("activate", e => { self.clients.claim(); });
+      self.addEventListener("fetch", e => {
+        e.respondWith(
+          caches.open(CACHE).then(cache =>
+            fetch(e.request).then(res => { cache.put(e.request, res.clone()); return res; })
+              .catch(() => cache.match(e.request))
+          )
+        );
+      });
+    `;
+    const swBlob = new Blob([swCode], { type: "application/javascript" });
+    const swUrl = URL.createObjectURL(swBlob);
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register(swUrl).catch(()=>{});
+    });
+  }
+})();
+</script>
+<style>
+  :root{
+    --bg:#0d1b12; --card:#132a1c; --card2:#1a3524;
+    --green:#1f8a4c; --green-l:#35c56f; --gold:#e6b800; --gold-l:#ffd93d;
+    --red:#e14f4f; --text:#eef7ef; --muted:#9db8a6; --border:#24462f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  #app{min-height:100%; display:flex; flex-direction:column;}
+  .screen{display:none; flex:1; flex-direction:column; padding:20px 18px 32px; max-width:480px; margin:0 auto; width:100%;}
+  .screen.active{display:flex;}
+  h1{font-size:22px; margin:4px 0 2px; letter-spacing:.3px;}
+  h1 .accent{color:var(--gold-l);}
+  .sub{color:var(--muted); font-size:14px; margin:0 0 20px;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:14px;}
+  label{display:block; font-size:13px; color:var(--muted); margin:12px 0 6px;}
+  label:first-child{margin-top:0;}
+  input{width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
+    border-radius:10px; padding:13px 14px; font-size:16px; outline:none;}
+  input:focus{border-color:var(--green-l);}
+  .btn{display:block; width:100%; text-align:center; border:none; border-radius:12px; padding:15px;
+    font-size:16px; font-weight:600; cursor:pointer; margin-top:14px; transition:transform .08s;}
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:linear-gradient(135deg,var(--green-l),var(--green)); color:#04140a;}
+  .btn-gold{background:linear-gradient(135deg,var(--gold-l),var(--gold)); color:#231a00;}
+  .btn-outline{background:transparent; border:1px solid var(--border); color:var(--text);}
+  .btn-danger{background:transparent; border:1px solid var(--red); color:var(--red);}
+  .btn-sm{padding:9px 12px; font-size:13px; margin-top:0; width:auto; display:inline-block;}
+  .row{display:flex; gap:10px;}
+  .row .btn{margin-top:0;}
+  .center{text-align:center;}
+  .code-display{font-size:38px; font-weight:800; letter-spacing:6px; color:var(--gold-l); text-align:center; margin:6px 0 14px;}
+  .balance{font-size:44px; font-weight:800; color:var(--green-l); text-align:center; margin:6px 0;}
+  .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .pill{background:var(--card2); border:1px solid var(--border); border-radius:999px; padding:5px 12px; font-size:12px; color:var(--muted);}
+  .player-row{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border);}
+  .player-row:last-child{border-bottom:none;}
+  .player-name{font-weight:600; font-size:15px;}
+  .player-bal{font-weight:700; color:var(--green-l);}
+  .tx{padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; display:flex; justify-content:space-between;}
+  .tx:last-child{border-bottom:none;}
+  .amt-in{font-weight:600; color:var(--green-l);}
+  .amt-out{font-weight:600; color:var(--red);}
+  video{width:100%; border-radius:14px; background:#000;}
+  .scan-wrap{position:relative;}
+  .scan-frame{position:absolute; inset:15%; border:3px solid var(--gold-l); border-radius:16px; pointer-events:none;}
+  .nav-back{background:none; border:none; color:var(--muted); font-size:14px; padding:0 0 10px; text-align:left; cursor:pointer;}
+  .err{color:var(--red); font-size:13px; margin-top:8px; min-height:16px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .empty{color:var(--muted); font-size:13px; text-align:center; padding:20px 0;}
+  .quickbtns{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;}
+  .stat-row{display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-bottom:10px;}
+  .stat-row b{color:var(--text);}
+  .qr-block{margin-bottom:16px;}
+  .qr-block:last-child{margin-bottom:0;}
+  .qr-label{font-size:12px; color:var(--muted); margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="screen active" id="screen-home">
+    <h1>💳 Maquininha <span class="accent">Banco Imobiliário</span></h1>
+    <p class="sub">Chega de papel-moeda. Cartão, PIX e QR entre banco e jogadores. Instale como app na tela inicial.</p>
+    <div class="card">
+      <div class="btn btn-primary" onclick="showScreen('screen-create')">🏦 Abrir Terminal (sou o banco)</div>
+      <div class="btn btn-outline" onclick="showScreen('screen-join-intro')">📲 Entrar como Jogador</div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-create">
+    <button class="nav-back" onclick="showScreen('screen-home')">‹ Voltar</button>
+    <h1>Abrir Terminal</h1>
+    <p class="sub">Este dispositivo vira a maquininha central da mesa.</p>
+    <div class="card">
+      <label>Saldo inicial por jogador (R$)</label>
+      <input id="create-balance" type="number" inputmode="numeric" value="4000">
+      <div class="btn btn-primary" onclick="createRoomFlow()">Criar Partida</div>
+      <div class="err" id="create-err"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-join-intro">
+    <button class="nav-back" onclick="showScreen('screen-home')">‹ Voltar</button>
+    <h1>Entrar na Partida</h1>
+    <p class="sub">Peça pro banqueiro mostrar o QR de entrada na tela do terminal.</p>
+    <div class="card center">
+      <div style="font-size:40px;">🏦 → 📷</div>
+      <div class="btn btn-primary" onclick="beginJoinScan()">Escanear QR do Banco</div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-join-name">
+    <h1>Quase lá!</h1>
+    <p class="sub">Como o banco deve te chamar?</p>
+    <div class="card">
+      <label>Seu nome</label>
+      <input id="join-name" placeholder="Ex: Victor">
+      <div class="btn btn-primary" onclick="finalizeJoin()">Entrar na Partida</div>
+      <div class="err" id="join-name-err"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-terminal">
+    <div class="topbar">
+      <span class="pill">🏦 Terminal</span>
+      <span class="pill" id="term-code-pill"></span>
+    </div>
+    <div class="card">
+      <div class="qr-block center">
+        <div class="qr-label">QR DE ENTRADA — jogadores escaneiam pra entrar na partida</div>
+        <div id="term-qr-join"></div>
+      </div>
+      <div class="qr-block center">
+        <div class="qr-label">QR DO BANCO — jogadores escaneiam pra pagar impostos, aluguéis e compras</div>
+        <div id="term-qr-pay"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stat-row">
+        <span>Jogadores ativos: <b id="term-player-count">0</b></span>
+        <span>Caixa em circulação: <b id="term-total-circ">R$ 0</b></span>
+      </div>
+      <b>Jogadores</b>
+      <div id="term-players"></div>
+    </div>
+
+    <div class="card">
+      <b>Ações rápidas do banco</b>
+      <p class="sub" style="margin:6px 0 0;">Toque num jogador acima e depois numa ação — pagamentos e cobranças do banco.</p>
+      <div class="quickbtns">
+        <button class="btn btn-gold btn-sm" onclick="quickBankAction(200,'Passou no GO')">Pagar +200 (GO)</button>
+        <button class="btn btn-danger btn-sm" onclick="quickBankAction(-100,'Imposto')">Cobrar -100 (Imposto)</button>
+      </div>
+      <div id="term-adjust-target" class="pill" style="margin-top:10px;">Nenhum jogador selecionado</div>
+      <div class="row" style="margin-top:8px;">
+        <input id="term-adjust-amount" type="number" placeholder="Valor (+ paga / - cobra)">
+        <input id="term-adjust-desc" placeholder="Motivo" style="flex:1.4;">
+      </div>
+      <div class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="applyManualAdjust()">Aplicar</div>
+    </div>
+
+    <div class="card">
+      <b>Extrato completo da partida</b>
+      <div id="term-log"></div>
+    </div>
+
+    <button class="btn btn-danger btn-sm" style="width:100%;" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
+  </div>
+
+  <div class="screen" id="screen-wallet">
+    <div class="topbar">
+      <span class="pill" id="wallet-name-pill">👤</span>
+      <span class="pill" id="wallet-code-pill"></span>
+    </div>
+    <div class="card center">
+      <div style="color:var(--muted);font-size:13px;">Meu saldo</div>
+      <div class="balance" id="wallet-balance">R$ 0</div>
+      <div class="grid2">
+        <div class="btn btn-primary" onclick="openPayFlow()">💸 Pagar</div>
+        <div class="btn btn-gold" onclick="openReceiveFlow()">📥 Receber</div>
+      </div>
+    </div>
+    <div class="card">
+      <b>Extrato</b>
+      <div id="wallet-log"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-pay-amount">
+    <button class="nav-back" onclick="showScreen('screen-wallet')">‹ Cancelar</button>
+    <h1>Pagar</h1>
+    <p class="sub">Escolha o valor e depois escaneie o QR de quem vai receber.</p>
+    <div class="card">
+      <label>Valor (R$)</label>
+      <input id="pay-amount" type="number" inputmode="numeric" placeholder="0">
+      <div class="btn btn-primary" onclick="goToPayScan()">Escanear QR do destinatário →</div>
+    </div>
+    <div class="err" id="pay-amount-err"></div>
+  </div>
+
+  <div class="screen" id="screen-scan">
+    <button class="nav-back" onclick="stopScanAndBack()">‹ Cancelar</button>
+    <h1 id="scan-title">Aproxime o QR</h1>
+    <p class="sub" id="scan-sub"></p>
+    <div class="card scan-wrap">
+      <video id="scan-video" playsinline muted></video>
+      <div class="scan-frame"></div>
+    </div>
+    <div class="err" id="scan-err"></div>
+  </div>
+
+  <div class="screen" id="screen-receive">
+    <button class="nav-back" onclick="showScreen('screen-wallet')">‹ Voltar</button>
+    <h1>Receber</h1>
+    <p class="sub">Mostre esse QR pra quem vai te pagar.</p>
+    <div class="card center">
+      <div id="my-qr"></div>
+      <div style="margin-top:10px;font-weight:700;" id="receive-name"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const JOIN_PREFIX = "BIMJOIN|";
+const PAY_PREFIX = "BIMPAY|";
+let scanStream = null;
+let scanRAF = null;
+let scanMode = null; // 'join' | 'pay'
+let pendingPayAmount = 0;
+let pendingJoinCode = null;
+let pollTimer = null;
+
+async function loadRoom(code){
+  try{
+    const r = await window.storage.get('room:'+code, true);
+    return r ? JSON.parse(r.value) : null;
+  }catch(e){ return null; }
+}
+async function saveRoom(room){
+  await window.storage.set('room:'+room.code, JSON.stringify(room), true);
+}
+async function deleteRoom(code){
+  try{ await window.storage.delete('room:'+code, true); }catch(e){}
+}
+function genCode(){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let c = "";
+  for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function genId(){ return Math.random().toString(36).slice(2,10); }
+
+function getSession(){
+  try{ return JSON.parse(localStorage.getItem('bim-session')||'null'); }catch(e){ return null; }
+}
+function setSession(s){ localStorage.setItem('bim-session', JSON.stringify(s)); }
+function clearSession(){ localStorage.removeItem('bim-session'); }
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ---------- Terminal creation ---------- */
+async function createRoomFlow(){
+  const balance = parseInt(document.getElementById('create-balance').value) || 4000;
+  const code = genCode();
+  const room = { code, initialBalance: balance, createdAt: Date.now(), players: [], transactions: [] };
+  await saveRoom(room);
+  setSession({ role:'terminal', roomCode: code });
+  document.getElementById('create-err').textContent = '';
+  enterTerminal(code);
+}
+
+async function enterTerminal(code){
+  showScreen('screen-terminal');
+  document.getElementById('term-code-pill').textContent = code;
+  document.getElementById('term-qr-join').innerHTML = '';
+  new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+code, width:170, height:170 });
+  document.getElementById('term-qr-pay').innerHTML = '';
+  new QRCode(document.getElementById('term-qr-pay'), { text: PAY_PREFIX+code+'|BANK', width:130, height:130 });
+  await refreshTerminal();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(refreshTerminal, 2000);
+}
+let selectedAdjustPlayer = null;
+async function refreshTerminal(){
+  const s = getSession();
+  if(!s || s.role!=='terminal') return;
+  const room = await loadRoom(s.roomCode);
+  if(!room){
+    clearInterval(pollTimer);
+    clearSession();
+    showScreen('screen-home');
+    return;
+  }
+  document.getElementById('term-player-count').textContent = room.players.length;
+  const totalCirc = room.players.reduce((sum,p)=>sum+p.balance,0);
+  document.getElementById('term-total-circ').textContent = 'R$ ' + totalCirc.toLocaleString('pt-BR');
+  const list = document.getElementById('term-players');
+  if(room.players.length===0){
+    list.innerHTML = '<div class="empty">Nenhum jogador entrou ainda</div>';
+  }else{
+    list.innerHTML = room.players.map(p=>`
+      <div class="player-row" onclick="selectAdjustPlayer('${p.id}','${escapeHtml(p.name)}')" style="cursor:pointer; ${selectedAdjustPlayer && selectedAdjustPlayer.id===p.id ? 'background:var(--card2);border-radius:10px;padding-left:8px;padding-right:8px;':''}">
+        <span class="player-name">${escapeHtml(p.name)}</span>
+        <span class="player-bal">R$ ${p.balance.toLocaleString('pt-BR')}</span>
+      </div>`).join('');
+  }
+  const log = document.getElementById('term-log');
+  const txs = [...room.transactions].reverse().slice(0,30);
+  log.innerHTML = txs.length ? txs.map(t=>`
+      <div class="tx">
+        <span>${escapeHtml(t.fromName)} → ${escapeHtml(t.toName)}${t.desc? ' · '+escapeHtml(t.desc):''}</span>
+        <span class="amt-out">R$ ${t.amount.toLocaleString('pt-BR')}</span>
+      </div>`).join('') : '<div class="empty">Sem transações ainda</div>';
+}
+function selectAdjustPlayer(id,name){
+  selectedAdjustPlayer = { id, name };
+  document.getElementById('term-adjust-target').textContent = 'Selecionado: ' + name;
+  refreshTerminal();
+}
+async function quickBankAction(amount, desc){
+  if(!selectedAdjustPlayer){ alert('Toque num jogador na lista primeiro.'); return; }
+  await bankAdjust(selectedAdjustPlayer.id, amount, desc);
+}
+async function applyManualAdjust(){
+  if(!selectedAdjustPlayer){ alert('Toque num jogador na lista primeiro.'); return; }
+  const amount = parseInt(document.getElementById('term-adjust-amount').value);
+  const desc = document.getElementById('term-adjust-desc').value.trim() || (amount>=0 ? 'Pagamento do banco' : 'Cobrança do banco');
+  if(!amount){ alert('Informe um valor.'); return; }
+  await bankAdjust(selectedAdjustPlayer.id, amount, desc);
+  document.getElementById('term-adjust-amount').value = '';
+  document.getElementById('term-adjust-desc').value = '';
+}
+async function bankAdjust(playerId, amount, desc){
+  const s = getSession();
+  const room = await loadRoom(s.roomCode);
+  const p = room.players.find(x=>x.id===playerId);
+  if(!p) return;
+  if(amount<0 && Math.abs(amount)>p.balance){ alert('O jogador não tem saldo suficiente pra essa cobrança.'); return; }
+  p.balance += amount;
+  const tx = amount>=0
+    ? { id: genId(), fromId:'BANK', fromName:'Banco', toId:p.id, toName:p.name, amount:Math.abs(amount), desc, ts:Date.now() }
+    : { id: genId(), fromId:p.id, fromName:p.name, toId:'BANK', toName:'Banco', amount:Math.abs(amount), desc, ts:Date.now() };
+  room.transactions.push(tx);
+  await saveRoom(room);
+  await refreshTerminal();
+}
+async function resetGameFlow(){
+  if(!confirm('Encerrar a partida e apagar todos os dados (saldos e extrato)? Essa ação não pode ser desfeita.')) return;
+  const s = getSession();
+  clearInterval(pollTimer);
+  await deleteRoom(s.roomCode);
+  clearSession();
+  showScreen('screen-home');
+}
+
+/* ---------- Join flow (via QR do banco) ---------- */
+function beginJoinScan(){
+  scanMode = 'join';
+  document.getElementById('scan-title').textContent = 'Escaneie o QR do Banco';
+  document.getElementById('scan-sub').textContent = 'Aponte a câmera pro "QR DE ENTRADA" mostrado no terminal.';
+  document.getElementById('scan-err').textContent = '';
+  showScreen('screen-scan');
+  startScanner();
+}
+async function handleJoinScanResult(code){
+  const room = await loadRoom(code);
+  if(!room){
+    document.getElementById('scan-err').textContent = 'Partida não encontrada. Peça pro banco mostrar o QR de novo.';
+    startScanner();
+    return;
+  }
+  stopScanner();
+  pendingJoinCode = code;
+  document.getElementById('join-name').value = '';
+  document.getElementById('join-name-err').textContent = '';
+  showScreen('screen-join-name');
+}
+async function finalizeJoin(){
+  const name = document.getElementById('join-name').value.trim();
+  const errEl = document.getElementById('join-name-err');
+  if(!name){ errEl.textContent = 'Digite seu nome.'; return; }
+  const room = await loadRoom(pendingJoinCode);
+  if(!room){ errEl.textContent = 'Essa partida não existe mais.'; return; }
+  const id = genId();
+  room.players.push({ id, name, balance: room.initialBalance });
+  await saveRoom(room);
+  setSession({ role:'player', roomCode: pendingJoinCode, playerId: id, playerName: name });
+  errEl.textContent = '';
+  enterWallet();
+}
+
+/* ---------- Wallet ---------- */
+async function enterWallet(){
+  showScreen('screen-wallet');
+  await refreshWallet();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(refreshWallet, 2000);
+}
+async function refreshWallet(){
+  const s = getSession();
+  if(!s || s.role!=='player') return;
+  const room = await loadRoom(s.roomCode);
+  if(!room){
+    clearInterval(pollTimer);
+    clearSession();
+    alert('A partida foi encerrada pelo banco.');
+    showScreen('screen-home');
+    return;
+  }
+  const p = room.players.find(x=>x.id===s.playerId);
+  if(!p) return;
+  document.getElementById('wallet-name-pill').textContent = '👤 '+p.name;
+  document.getElementById('wallet-code-pill').textContent = s.roomCode;
+  document.getElementById('wallet-balance').textContent = 'R$ ' + p.balance.toLocaleString('pt-BR');
+  const mine = [...room.transactions].filter(t=>t.fromId===p.id || t.toId===p.id).reverse().slice(0,25);
+  const log = document.getElementById('wallet-log');
+  log.innerHTML = mine.length ? mine.map(t=>{
+    const out = t.fromId===p.id;
+    return `<div class="tx">
+      <span>${out? 'Para '+escapeHtml(t.toName) : 'De '+escapeHtml(t.fromName)}${t.desc? ' · '+escapeHtml(t.desc):''}</span>
+      <span class="${out?'amt-out':'amt-in'}">${out?'-':'+'} R$ ${t.amount.toLocaleString('pt-BR')}</span>
+    </div>`;
+  }).join('') : '<div class="empty">Sem transações ainda</div>';
+}
+
+/* ---------- Pay flow (via QR — a leitura já confirma o pagamento) ---------- */
+function openPayFlow(){
+  document.getElementById('pay-amount').value = '';
+  document.getElementById('pay-amount-err').textContent = '';
+  showScreen('screen-pay-amount');
+}
+function goToPayScan(){
+  const amount = parseInt(document.getElementById('pay-amount').value);
+  const errEl = document.getElementById('pay-amount-err');
+  if(!amount || amount<=0){ errEl.textContent = 'Informe um valor válido.'; return; }
+  pendingPayAmount = amount;
+  errEl.textContent = '';
+  scanMode = 'pay';
+  document.getElementById('scan-title').textContent = 'Aproxime o QR';
+  document.getElementById('scan-sub').textContent = 'Aponte a câmera pro QR de quem vai receber R$ ' + amount.toLocaleString('pt-BR') + '.';
+  document.getElementById('scan-err').textContent = '';
+  showScreen('screen-scan');
+  startScanner();
+}
+async function handlePayScanResult(roomCode, targetId){
+  const s = getSession();
+  if(roomCode !== s.roomCode){
+    document.getElementById('scan-err').textContent = 'Esse QR é de outra partida.';
+    startScanner();
+    return;
+  }
+  if(targetId === s.playerId){
+    document.getElementById('scan-err').textContent = 'Você não pode pagar pra si mesmo.';
+    startScanner();
+    return;
+  }
+  let targetName = 'Banco';
+  if(targetId !== 'BANK'){
+    const room = await loadRoom(s.roomCode);
+    const p = room.players.find(x=>x.id===targetId);
+    if(!p){ document.getElementById('scan-err').textContent = 'Jogador não encontrado.'; startScanner(); return; }
+    targetName = p.name;
+  }
+  stopScanner();
+  await executePayment(targetId, targetName, pendingPayAmount);
+}
+async function executePayment(targetId, targetName, amount){
+  const s = getSession();
+  const room = await loadRoom(s.roomCode);
+  const me = room.players.find(x=>x.id===s.playerId);
+  if(amount > me.balance){
+    alert('Saldo insuficiente.');
+    showScreen('screen-wallet');
+    return;
+  }
+  me.balance -= amount;
+  if(targetId !== 'BANK'){
+    const target = room.players.find(x=>x.id===targetId);
+    if(target) target.balance += amount;
+  }
+  room.transactions.push({
+    id: genId(), fromId: me.id, fromName: me.name,
+    toId: targetId, toName: targetName, amount, desc:'', ts: Date.now()
+  });
+  await saveRoom(room);
+  showScreen('screen-wallet');
+  await refreshWallet();
+}
+
+/* ---------- Generic QR scanner ---------- */
+async function startScanner(){
+  const video = document.getElementById('scan-video');
+  const errEl = document.getElementById('scan-err');
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = scanStream;
+    await video.play();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const tick = () => {
+      if(!scanStream) return;
+      if(video.readyState === video.HAVE_ENOUGH_DATA){
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code = jsQR(img.data, img.width, img.height);
+        if(code && code.data){
+          if(scanMode==='join' && code.data.startsWith(JOIN_PREFIX)){
+            const roomCode = code.data.slice(JOIN_PREFIX.length);
+            handleJoinScanResult(roomCode);
+            return;
+          }
+          if(scanMode==='pay' && code.data.startsWith(PAY_PREFIX)){
+            const parts = code.data.slice(PAY_PREFIX.length).split('|'); // [roomCode, targetId]
+            handlePayScanResult(parts[0], parts[1]);
+            return;
+          }
+        }
+      }
+      scanRAF = requestAnimationFrame(tick);
+    };
+    scanRAF = requestAnimationFrame(tick);
+  }catch(e){
+    errEl.textContent = 'Não foi possível acessar a câmera. Verifique a permissão.';
+  }
+}
+function stopScanner(){
+  if(scanRAF) cancelAnimationFrame(scanRAF);
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+}
+function stopScanAndBack(){
+  stopScanner();
+  showScreen(scanMode==='join' ? 'screen-join-intro' : 'screen-pay-amount');
+}
+
+/* ---------- Receive ---------- */
+async function openReceiveFlow(){
+  const s = getSession();
+  document.getElementById('my-qr').innerHTML = '';
+  new QRCode(document.getElementById('my-qr'), { text: PAY_PREFIX+s.roomCode+'|'+s.playerId, width:180, height:180 });
+  document.getElementById('receive-name').textContent = s.playerName;
+  showScreen('screen-receive');
+}
+
+/* ---------- Utils ---------- */
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------- Resume session ---------- */
+(async function init(){
+  const s = getSession();
+  if(!s) return;
+  if(s.role==='terminal'){
+    const room = await loadRoom(s.roomCode);
+    if(room) enterTerminal(s.roomCode); else clearSession();
+  }else if(s.role==='player'){
+    const room = await loadRoom(s.roomCode);
+    if(room && room.players.find(p=>p.id===s.playerId)) enterWallet(); else clearSession();
+  }
+})();
+</script>
+</body>
+</html>
