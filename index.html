@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Maquininha">
 <meta name="mobile-web-app-capable" content="yes">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (function setupPWA(){
@@ -189,6 +189,12 @@
     <div class="card center">
       <div style="font-size:40px;">🏦 → 📷</div>
       <div class="btn btn-primary" onclick="beginJoinScan()">Escanear QR do Banco</div>
+    </div>
+    <div class="card">
+      <label>Ou digite o código da partida (5 dígitos)</label>
+      <input id="join-manual-code" maxlength="5" inputmode="text" style="text-transform:uppercase; letter-spacing:4px; font-weight:700; text-align:center;" placeholder="EX: A7XQP">
+      <div class="btn btn-outline" onclick="manualJoinByCode()">Entrar com código</div>
+      <div class="err" id="join-manual-err"></div>
     </div>
   </div>
 
@@ -539,6 +545,19 @@ async function handleJoinScanResult(code){
     return;
   }
   stopScanner();
+  goToJoinName(code);
+}
+async function manualJoinByCode(){
+  const errEl = document.getElementById('join-manual-err');
+  const code = document.getElementById('join-manual-code').value.trim().toUpperCase();
+  if(!code || code.length < 4){ errEl.textContent = 'Digite o código de até 5 dígitos informado pelo banco.'; return; }
+  errEl.textContent = 'Verificando partida…';
+  const room = await loadRoom(code);
+  if(!room){ errEl.textContent = 'Partida não encontrada. Confira o código com o banco.'; return; }
+  errEl.textContent = '';
+  goToJoinName(code);
+}
+function goToJoinName(code){
   pendingJoinCode = code;
   document.getElementById('join-name').value = '';
   document.getElementById('join-name-err').textContent = '';
@@ -663,6 +682,10 @@ async function executePayment(targetId, targetName, amount){
 async function startScanner(){
   const video = document.getElementById('scan-video');
   const errEl = document.getElementById('scan-err');
+  if(typeof jsQR !== 'function'){
+    errEl.textContent = 'Não foi possível carregar o leitor de QR. Use a opção de digitar o código abaixo.';
+    return;
+  }
   try{
     scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     video.srcObject = scanStream;
@@ -675,7 +698,8 @@ async function startScanner(){
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code = jsQR(img.data, img.width, img.height);
+        let code = null;
+        try{ code = jsQR(img.data, img.width, img.height); }catch(err){ /* frame ilegível, tenta o próximo */ }
         if(code && code.data){
           if(scanMode==='join' && code.data.startsWith(JOIN_PREFIX)){
             const roomCode = code.data.slice(JOIN_PREFIX.length);
