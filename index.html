@@ -219,9 +219,9 @@
     </div>
 
     <div class="seg">
-      <div class="seg-opt active" id="tabbtn-jogadores" onclick="switchTermTab('jogadores')">👥 Jogadores</div>
+      <div class="seg-opt active" id="tabbtn-jogadores" onclick="switchTermTab('jogadores')" style="flex:0 0 52px;">👥</div>
       <div class="seg-opt" id="tabbtn-operacao" onclick="switchTermTab('operacao')">💰 Operação</div>
-      <div class="seg-opt player-tab" id="tabbtn-viewplayer" onclick="switchActiveView('player')" style="display:none;">👤 Jogador</div>
+      <div class="seg-opt player-tab" id="tabbtn-viewplayer" onclick="goToPlayerTabFromBank()">👤 Jogador</div>
     </div>
 
     <div id="term-tab-jogadores" class="term-tab">
@@ -235,7 +235,6 @@
           <span>Em circulação: <b id="term-total-circ" style="color:var(--text);">G$ 0</b></span>
         </div>
         <div id="term-players"></div>
-        <button class="btn btn-secondary" id="term-also-player-btn" onclick="becomePlayerToo()" style="margin-top:10px; display:none;">🎮 Também jogar nesta partida</button>
       </div>
     </div>
 
@@ -471,10 +470,12 @@ async function enterTerminal(code){
 }
 function updateDualBar(){
   const s = getSession();
-  const tabP = document.getElementById('tabbtn-viewplayer'); if(tabP) tabP.style.display = (s && s.isBank && s.playerId) ? '' : 'none';
-  const roleSeg = document.getElementById('wallet-role-seg'); if(roleSeg) roleSeg.style.display = (s && s.isBank && s.playerId) ? '' : 'none';
-  const btnP = document.getElementById('term-also-player-btn'); if(btnP) btnP.style.display = (s && s.isBank && !s.playerId) ? '' : 'none';
+  const roleSeg = document.getElementById('wallet-role-seg'); if(roleSeg) roleSeg.style.display = (s && s.isBank) ? '' : 'none';
   const btnB = document.getElementById('wallet-also-bank-btn'); if(btnB) btnB.style.display = (s && s.playerId && !s.isBank) ? '' : 'none';
+}
+function goToPlayerTabFromBank(){
+  const s = getSession(); if(!s) return;
+  if(s.playerId) switchActiveView('player'); else becomePlayerToo();
 }
 function switchActiveView(view){
   const s = getSession(); if(!s) return;
@@ -492,8 +493,8 @@ async function becomePlayerToo(){
   const id = genId();
   room.players.push({ id, name, balance: room.initialBalance, pendingRequest: null });
   await saveRoom(room);
-  s.playerId = id; s.playerName = name; setSession(s);
-  await refreshTerminal(); updateDualBar();
+  s.playerId = id; s.playerName = name; s.activeView = 'player'; setSession(s);
+  await enterWallet();
 }
 async function becomeBankToo(){
   const s = getSession(); if(!s || s.isBank || !s.playerId) return;
