@@ -136,10 +136,8 @@
   .boot-status{position:fixed; top:0; left:0; right:0; background:var(--accent); color:var(--bg); font-size:12px;
     text-align:center; padding:6px; z-index:999; display:none;}
   .pending-banner{background:var(--green-bg); border:1px solid var(--green-border); border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:13px;}
-  .dual-bar{display:none; position:sticky; top:0; z-index:400; background:var(--bg); padding:12px 20px 0; max-width:420px; margin:0 auto; width:100%; box-sizing:border-box;}
-  .dual-bar .seg{margin-bottom:0;}
-  .dual-bar .seg-opt.bank.active{background:var(--accent-d); color:var(--accent-l);}
-  .dual-bar .seg-opt.player.active{background:var(--green-bg); color:var(--green);}
+  .seg-opt.player-tab{color:var(--green);}
+  .seg-opt.bank-tab{color:var(--accent-l);}
   .success-overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
     background:rgba(22,24,38,.92); opacity:0; pointer-events:none; transition:opacity .25s; z-index:500;}
   .success-overlay.show{opacity:1; pointer-events:auto;}
@@ -159,12 +157,6 @@
     <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </div>
   <div id="success-message"></div>
-</div>
-<div id="dual-bar" class="dual-bar">
-  <div class="seg">
-    <div class="seg-opt bank" id="dualtab-bank" onclick="switchActiveView('bank')">🏦 Banco</div>
-    <div class="seg-opt player" id="dualtab-player" onclick="switchActiveView('player')">👤 Jogador</div>
-  </div>
 </div>
 <div id="app">
 
@@ -229,6 +221,7 @@
     <div class="seg">
       <div class="seg-opt active" id="tabbtn-jogadores" onclick="switchTermTab('jogadores')">👥 Jogadores</div>
       <div class="seg-opt" id="tabbtn-operacao" onclick="switchTermTab('operacao')">💰 Operação</div>
+      <div class="seg-opt player-tab" id="tabbtn-viewplayer" onclick="switchActiveView('player')" style="display:none;">👤 Jogador</div>
     </div>
 
     <div id="term-tab-jogadores" class="term-tab">
@@ -308,6 +301,11 @@
         <span class="pill" id="wallet-code-pill"></span>
         <span class="pill pill-link" onclick="leaveSession()">Sair</span>
       </div>
+    </div>
+
+    <div class="seg" id="wallet-role-seg" style="display:none;">
+      <div class="seg-opt player-tab active">👤 Jogador</div>
+      <div class="seg-opt bank-tab" onclick="switchActiveView('bank')">🏦 Banco</div>
     </div>
 
     <div class="wallet-card">
@@ -473,12 +471,8 @@ async function enterTerminal(code){
 }
 function updateDualBar(){
   const s = getSession();
-  const bar = document.getElementById('dual-bar');
-  if(s && s.isBank && s.playerId){
-    bar.style.display='';
-    document.getElementById('dualtab-bank').classList.toggle('active', s.activeView==='bank');
-    document.getElementById('dualtab-player').classList.toggle('active', s.activeView==='player');
-  } else if(bar) { bar.style.display='none'; }
+  const tabP = document.getElementById('tabbtn-viewplayer'); if(tabP) tabP.style.display = (s && s.isBank && s.playerId) ? '' : 'none';
+  const roleSeg = document.getElementById('wallet-role-seg'); if(roleSeg) roleSeg.style.display = (s && s.isBank && s.playerId) ? '' : 'none';
   const btnP = document.getElementById('term-also-player-btn'); if(btnP) btnP.style.display = (s && s.isBank && !s.playerId) ? '' : 'none';
   const btnB = document.getElementById('wallet-also-bank-btn'); if(btnB) btnB.style.display = (s && s.playerId && !s.isBank) ? '' : 'none';
 }
@@ -615,7 +609,6 @@ function leaveSession(){
   else msg = 'Sair da carteira? Você vai precisar escanear o QR de novo pra voltar a jogar.';
   if(!confirm(msg)) return;
   clearInterval(pollTimer); clearSession(); showScreen('screen-home');
-  const bar = document.getElementById('dual-bar'); if(bar) bar.style.display='none';
 }
 
 /* ---------- Join ---------- */
