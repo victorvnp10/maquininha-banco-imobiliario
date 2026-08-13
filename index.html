@@ -1,748 +1,755 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Maquininha</title>
-<meta name="theme-color" content="#161826">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Maquininha">
-<meta name="mobile-web-app-capable" content="yes">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-(function setupPWA(){
-  const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
-    <rect width="512" height="512" rx="96" fill="#161826"/>
-    <rect x="40" y="40" width="432" height="432" rx="64" fill="#9184d9"/>
-    <text x="256" y="300" font-size="200" text-anchor="middle" font-family="Arial" fill="#161826">G$</text>
-  </svg>`;
-  const iconUrl = "data:image/svg+xml;base64," + btoa(ICON_SVG);
-  const manifest = {
-    name: "Maquininha — carteira de jogo",
-    short_name: "Maquininha",
-    start_url: ".", scope: ".", display: "standalone",
-    background_color: "#161826", theme_color: "#161826", orientation: "portrait",
-    icons: [
-      { src: iconUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
-      { src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any" }
-    ]
-  };
-  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
-  const link = document.createElement("link");
-  link.rel = "manifest"; link.href = URL.createObjectURL(manifestBlob);
-  document.head.appendChild(link);
-  const appleIcon = document.createElement("link");
-  appleIcon.rel = "apple-touch-icon"; appleIcon.href = iconUrl;
-  document.head.appendChild(appleIcon);
-  if ("serviceWorker" in navigator) {
-    const swCode = `
-      const CACHE = "maquininha-v2";
-      self.addEventListener("install", e => { self.skipWaiting(); });
-      self.addEventListener("activate", e => { self.clients.claim(); });
-      self.addEventListener("fetch", e => {
-        e.respondWith(
-          caches.open(CACHE).then(cache =>
-            fetch(e.request).then(res => { cache.put(e.request, res.clone()); return res; })
-              .catch(() => cache.match(e.request))
-          )
-        );
-      });
-    `;
-    const swBlob = new Blob([swCode], { type: "application/javascript" });
-    const swUrl = URL.createObjectURL(swBlob);
-    window.addEventListener("load", () => { navigator.serviceWorker.register(swUrl).catch(()=>{}); });
-  }
-})();
-</script>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  :root{
-    --bg:#161826; --card:#232532; --card2:#2b2741;
-    --accent:#9184d9; --accent-l:#b5abfc; --accent-d:#423a6a;
-    --green:oklch(66% 0.125 145); --green-bg:oklch(26% 0.05 150); --green-border:oklch(38% 0.08 150);
-    --red:oklch(66% 0.125 25);
-    --text:#e9e9ed; --muted:rgba(233,233,237,.6); --border:rgba(233,233,237,.16);
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0; height:100%; background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,sans-serif;}
-  #app{min-height:100%; display:flex; flex-direction:column;}
-  .screen{display:none; flex:1; flex-direction:column; padding:26px 20px 32px; max-width:420px; margin:0 auto; width:100%;}
-  .screen.active{display:flex;}
-  h1{font-size:22px; font-weight:600; margin:0 0 4px; letter-spacing:-.01em;}
-  h1 .accent{color:var(--accent);}
-  .sub{color:var(--muted); font-size:14px; margin:0 0 20px; line-height:1.5;}
-  .card{background:var(--card); border-radius:14px; padding:18px; margin-bottom:14px;}
-  label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px;}
-  input{width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
-    border-radius:10px; padding:12px 13px; font-size:16px; outline:none; font-family:inherit;}
-  input:focus{border-color:var(--accent);}
-  .btn{display:block; width:100%; text-align:center; border:1px solid transparent; border-radius:10px; padding:15px;
-    font-size:16px; font-weight:700; cursor:pointer; margin-top:0; font-family:inherit; background:transparent; color:var(--text);}
-  .btn:active{transform:scale(.98);}
-  .btn:disabled{opacity:.45; pointer-events:none;}
-  .btn-primary{background:var(--accent); color:var(--bg); border-color:var(--accent);}
-  .btn-outline{background:transparent; border:1px solid var(--accent); color:var(--accent);}
-  .btn-green{background:var(--green); color:var(--bg); border-color:var(--green);}
-  .btn-red{background:var(--red); color:var(--bg); border-color:var(--red);}
-  .btn-ghost{background:transparent; border:none; color:var(--muted); font-weight:500; padding:0 0 16px; text-align:left; width:auto;}
-  .btn-secondary{background:transparent; border:1px solid var(--border); color:var(--text);}
-  .row{display:flex; gap:10px;}
-  .center{text-align:center;}
-  .balance{font-size:34px; font-weight:800; color:#fff; margin:2px 0 12px;}
-  .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-right:0;}
-  .pill{background:var(--card); border:1px solid var(--border); border-radius:999px; padding:5px 12px; font-size:12px; color:var(--muted);}
-  .pill-link{cursor:pointer; color:var(--red); border-color:var(--red);}
-  .player-row{display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--border);}
-  .player-row:last-child{border-bottom:none;}
-  .player-name{font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px;}
-  .player-bal{font-weight:700; color:var(--accent);}
-  .tag{display:inline-flex; align-items:center; font-size:10px; padding:2px 7px; border-radius:8px;}
-  .tag-waiting{background:var(--green-bg); color:var(--green); border:1px solid var(--green-border);}
-  .tx{padding:9px 0; border-bottom:1px solid var(--border); font-size:12px; display:flex; justify-content:space-between; gap:8px;}
-  .tx:last-child{border-bottom:none;}
-  .amt-in{font-weight:700; color:var(--green);}
-  .amt-out{font-weight:700; color:var(--red);}
-  video{width:100%; border-radius:14px; background:#000;}
-  .scan-wrap{position:relative;}
-  .scan-frame{position:absolute; inset:15%; border:3px solid var(--accent-l); border-radius:16px; pointer-events:none;}
-  .err{color:var(--red); font-size:13px; margin-top:8px; min-height:16px;}
-  .empty{color:var(--muted); font-size:13px; text-align:center; padding:18px 0;}
-  .qr-box{display:inline-block; padding:10px; background:#fff; border-radius:10px;}
-  .bank-badge{font-weight:700; font-size:15px; color:var(--accent);}
-  #screen-terminal{padding-bottom:0;}
-  .seg{display:flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:16px;}
-  .seg-opt{flex:1; text-align:center; padding:10px; font-size:13px; font-weight:600; cursor:pointer;}
-  .seg-opt.active{background:var(--accent-d); color:var(--accent-l);}
-  .seg-opt+.seg-opt{border-left:1px solid var(--border);}
-  .op-player-row{display:flex; justify-content:space-between; align-items:center; padding:10px 12px;
-    border-radius:10px; margin-bottom:6px; background:var(--bg); border:1px solid var(--border); cursor:pointer;}
-  .wallet-card{background:linear-gradient(135deg,var(--card2),var(--bg)); border:1px solid var(--border);
-    border-radius:20px; padding:24px 22px; position:relative; overflow:hidden; margin-bottom:16px;}
-  .wallet-card::before{content:""; position:absolute; top:-40px; right:-40px; width:140px; height:140px;
-    border-radius:50%; background:radial-gradient(circle, rgba(145,132,217,.22), transparent 70%);}
-  .wallet-card-brand{font-size:11px; letter-spacing:1.5px; color:var(--accent-l); font-weight:700; text-transform:uppercase;}
-  .wallet-card-chip{font-size:26px; margin:16px 0 4px;}
-  .wallet-card-name{font-size:14px; color:var(--muted);}
-  .action-row{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;}
-  .action-btn{background:var(--card); border-radius:16px; padding:20px 10px; text-align:center; cursor:pointer;}
-  .action-btn:active{transform:scale(.97);}
-  .action-btn-icon{font-size:30px; display:block; margin-bottom:6px;}
-  .action-btn.pay .action-btn-icon{color:var(--red);}
-  .action-btn.receive .action-btn-icon{color:var(--green);}
-  .action-btn-label{font-size:15px; font-weight:700;}
-  .boot-status{position:fixed; top:0; left:0; right:0; background:var(--accent); color:var(--bg); font-size:12px;
-    text-align:center; padding:6px; z-index:999; display:none;}
-  .pending-banner{background:var(--green-bg); border:1px solid var(--green-border); border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:13px;}
-  .success-overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
-    background:rgba(22,24,38,.92); opacity:0; pointer-events:none; transition:opacity .25s; z-index:500;}
-  .success-overlay.show{opacity:1; pointer-events:auto;}
-  .success-circle{width:84px; height:84px; border-radius:50%; border:3px solid var(--green); display:flex; align-items:center; justify-content:center;
-    transform:scale(.6); opacity:0; transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .3s, border-color .2s;}
-  .success-overlay.show .success-circle{transform:scale(1); opacity:1;}
-  .success-circle svg{width:40px; height:40px; color:var(--green);}
-  .success-circle path{stroke-dasharray:24; stroke-dashoffset:24; transition:stroke-dashoffset .4s ease .15s;}
-  .success-overlay.show .success-circle path{stroke-dashoffset:0;}
-  #success-message{font-size:16px; font-weight:700; color:var(--text);}
-</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
 </head>
 <body>
-<div id="boot-status" class="boot-status">Conectando ao servidor…</div>
-<div id="success-overlay" class="success-overlay">
-  <div class="success-circle">
-    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  </div>
-  <div id="success-message"></div>
-</div>
-<div id="app">
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/nocturne-269846fb-8ccf-4750-9d78-b79eeb5bdc4b/styles.css">
+  <script src="_ds/nocturne-269846fb-8ccf-4750-9d78-b79eeb5bdc4b/_ds_bundle.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body{margin:0;background:#0e0f18;-webkit-tap-highlight-color:transparent;}
+    * { box-sizing:border-box; }
+    input::placeholder{color:color-mix(in srgb, var(--color-text) 40%, transparent);}
+    a{color:var(--color-accent);} a:hover{color:var(--color-accent-400);}
+  </style>
+</helmet>
 
-  <div class="screen active" id="screen-home">
-    <div style="font-size:34px;margin-bottom:2px;">🎲</div>
-    <h1 style="font-size:26px;">Maquininha <span class="accent">G$</span></h1>
-    <p class="sub">Chega de papel-moeda. Carteira digital pra qualquer jogo de tabuleiro com banco — cartão e QR entre banco e jogadores.</p>
-    <div class="card" style="display:flex; flex-direction:column; gap:12px;">
-      <button class="btn btn-primary" onclick="showScreen('screen-create')" style="padding:16px;">🏦 Abrir Terminal — sou o banco</button>
-      <button class="btn btn-secondary" onclick="showScreen('screen-join-intro')">📲 Entrar como Jogador</button>
-    </div>
-  </div>
+<div style="width:402px;height:874px;margin:0 auto;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);display:flex;flex-direction:column;overflow:hidden;position:relative;border-radius:36px;box-shadow:0 0 0 1px var(--color-neutral-800), 0 16px 40px rgba(0,0,0,.5);">
 
-  <div class="screen" id="screen-create">
-    <button class="btn btn-ghost" onclick="showScreen('screen-home')">‹ Voltar</button>
-    <h1>Abrir Terminal</h1>
-    <p class="sub">Este dispositivo vira a maquininha central da mesa.</p>
-    <div class="card">
-      <label>Saldo inicial por jogador (G$)</label>
-      <input id="create-balance" type="number" inputmode="numeric" value="4000">
-      <button class="btn btn-primary" id="create-btn" onclick="createRoomFlow()" style="margin-top:14px;">Criar Partida</button>
-      <div class="err" id="create-err"></div>
-    </div>
-  </div>
-
-  <div class="screen" id="screen-join-intro">
-    <button class="btn btn-ghost" onclick="showScreen('screen-home')">‹ Voltar</button>
-    <h1>Entrar na Partida</h1>
-    <p class="sub">Peça pro banqueiro mostrar o QR de entrada na tela do terminal.</p>
-    <div class="card center">
-      <div style="font-size:36px;">🏦 → 📷</div>
-      <button class="btn btn-primary" onclick="beginJoinScan()" style="margin-top:14px;">Escanear QR do Banco</button>
-    </div>
-    <div class="card">
-      <label>Ou digite o código da partida (5 dígitos)</label>
-      <input id="join-manual-code" maxlength="5" inputmode="text" style="text-transform:uppercase; letter-spacing:4px; font-weight:700; text-align:center;" placeholder="EX: A7XQP">
-      <button class="btn btn-secondary" onclick="manualJoinByCode()" style="margin-top:14px;">Entrar com código</button>
-      <div class="err" id="join-manual-err"></div>
-    </div>
-  </div>
-
-  <div class="screen" id="screen-join-name">
-    <h1>Quase lá!</h1>
-    <p class="sub">Como o banco deve te chamar?</p>
-    <div class="card">
-      <label>Seu nome</label>
-      <input id="join-name" placeholder="Ex: Victor">
-      <button class="btn btn-primary" id="join-name-btn" onclick="finalizeJoin()" style="margin-top:14px;">Entrar na Partida</button>
-      <div class="err" id="join-name-err"></div>
-    </div>
-  </div>
-
-  <div class="screen" id="screen-terminal">
-    <div class="topbar">
-      <span class="bank-badge">🏦 Terminal do Banco</span>
-      <div class="row" style="gap:6px;">
-        <span class="pill" id="term-code-pill"></span>
-        <span class="pill pill-link" onclick="leaveSession()">Sair</span>
+  <sc-if value="{{ hasSuccess }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;border-radius:36px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:rgba(22,24,38,.94);z-index:500;">
+      <div style="width:84px;height:84px;border-radius:50%;border:3px solid {{ successColor }};display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" style="width:40px;height:40px;"><path d="M5 12.5L9.5 17L19 7" stroke="{{ successColor }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
+      <div style="font-size:16px;font-weight:700;">{{ successMessage }}</div>
     </div>
+  </sc-if>
 
-    <div class="seg">
-      <div class="seg-opt active" id="tabbtn-jogadores" onclick="switchTermTab('jogadores')">👥 Jogadores</div>
-      <div class="seg-opt" id="tabbtn-operacao" onclick="switchTermTab('operacao')">💰 Operação</div>
-    </div>
-
-    <div id="term-tab-jogadores" class="term-tab">
-      <div class="card center">
-        <div class="sub" style="margin-bottom:10px;">QR DE ENTRADA — o jogador escaneia pra se cadastrar na partida</div>
-        <div id="term-qr-join"></div>
-      </div>
-      <div class="card">
-        <div class="row" style="justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
-          <span>Jogadores: <b id="term-player-count" style="color:var(--text);">0</b></span>
-          <span>Em circulação: <b id="term-total-circ" style="color:var(--text);">G$ 0</b></span>
+  <sc-if value="{{ showRoleSwitch }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:16px;right:16px;z-index:50;">
+      <button onClick="{{ toggleRoleMenu }}" class="tag tag-neutral" style="cursor:pointer;border:none;gap:6px;">{{ roleSwitchLabel }} <span style="opacity:.6;">▾</span></button>
+      <sc-if value="{{ roleMenuOpen }}" hint-placeholder-val="{{ false }}">
+        <div class="card elev-md" style="position:absolute;right:0;top:38px;padding:6px;min-width:180px;max-height:280px;overflow-y:auto;gap:2px;">
+          <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent);padding:6px 8px 4px;">Ver como (demo)</div>
+          <button onClick="{{ switchToBank }}" class="btn" style="display:flex;width:100%;justify-content:flex-start;font-size:13px;">🏦 Banco</button>
+          <sc-for list="{{ switchablePlayers }}" as="p" hint-placeholder-count="2">
+            <button onClick="{{ p.onClick }}" class="btn" style="display:flex;width:100%;justify-content:flex-start;font-size:13px;">👤 {{ p.name }}</button>
+          </sc-for>
         </div>
-        <div id="term-players"></div>
-      </div>
+      </sc-if>
     </div>
+  </sc-if>
 
-    <div id="term-tab-operacao" class="term-tab" style="display:none;">
-      <div class="card">
-        <b>📥 Cobrar de um jogador</b>
-        <p class="sub" style="margin:4px 0 10px;">Defina o valor e gere o QR pra ele escanear.</p>
-        <div id="term-charge-pending" style="display:none;">
-          <div class="center">
-            <div id="term-qr-charge" class="qr-box"></div>
-            <div style="font-size:24px;font-weight:800;color:var(--green);margin-top:10px;" id="term-charge-amount"></div>
-            <button class="btn btn-secondary" onclick="cancelBankCharge()" style="margin-top:12px;">Cancelar cobrança</button>
+  <div style="flex:1;overflow-y:auto;padding:26px 20px 28px;">
+
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="font-size:34px;margin-bottom:2px;">🎲</div>
+        <h1 style="margin:0 0 6px;">Maquininha <span style="color:var(--color-accent);">{{ currencySymbol }}</span></h1>
+        <p class="text-muted" style="font-size:14px;margin:0 0 26px;">Chega de dinheiro de papel. Carteira digital pra qualquer jogo de tabuleiro com banco — cartão e QR entre banco e jogadores.</p>
+        <div class="card" style="padding:18px;gap:12px;">
+          <button onClick="{{ goBank }}" class="btn btn-primary btn-block" style="padding:16px;font-size:16px;margin-top:0;">🏦 Abrir Terminal <span style="opacity:.7;font-weight:500;">— sou o banco</span></button>
+          <button onClick="{{ goJoin }}" class="btn btn-secondary btn-block" style="padding:15px;font-size:16px;">📲 Entrar como Jogador</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isBankSetup }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <button onClick="{{ goHome }}" class="btn btn-ghost" style="padding-left:0;margin-bottom:16px;">‹ Voltar</button>
+        <h1 style="font-size:22px;margin:0 0 4px;">Abrir Terminal</h1>
+        <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Este aparelho vira o banco da mesa.</p>
+        <div class="card" style="padding:18px;">
+          <div class="field">
+            <label>Saldo inicial por jogador ({{ currencySymbol }})</label>
+            <input class="input" type="number" value="{{ createBalanceInput }}" onChange="{{ setCreateBalance }}" inputmode="numeric" style="font-size:16px;min-height:44px;" />
+          </div>
+          <button onClick="{{ createBank }}" class="btn btn-primary btn-block" style="padding:15px;font-size:16px;">Criar Partida</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isJoinIntro }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <button onClick="{{ goHome }}" class="btn btn-ghost" style="padding-left:0;margin-bottom:16px;">‹ Voltar</button>
+        <h1 style="font-size:22px;margin:0 0 4px;">Entrar na Partida</h1>
+        <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Peça pro banco mostrar o QR de entrada, ou digite o código.</p>
+        <div class="card" style="padding:18px;text-align:center;margin-bottom:14px;">
+          <sc-if value="{{ bankExists }}" hint-placeholder-val="{{ false }}">
+            <div ref="{{ joinIntroQrRef }}" style="display:inline-block;padding:10px;background:#fff;border-radius:var(--radius-md);"></div>
+            <div style="font-size:11px;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-top:8px;">QR do banco ativo — {{ bankCode }}</div>
+            <button onClick="{{ simulateJoinScan }}" class="btn btn-primary btn-block" style="padding:14px;font-size:15px;">📷 Simular leitura do QR</button>
+          </sc-if>
+          <sc-if value="{{ bankMissing }}" hint-placeholder-val="{{ false }}">
+            <div class="text-muted" style="font-size:13px;padding:16px 0;">Nenhum terminal aberto ainda. Peça pro banco criar a partida.</div>
+          </sc-if>
+        </div>
+        <div class="card" style="padding:18px;">
+          <div class="field">
+            <label>Ou digite o código da partida</label>
+            <input class="input" type="text" value="{{ manualCodeInput }}" onChange="{{ setManualCode }}" maxlength="5" placeholder="EX: A7XQP" style="font-size:18px;font-weight:700;letter-spacing:5px;text-align:center;text-transform:uppercase;min-height:44px;" />
+          </div>
+          <button onClick="{{ manualJoin }}" class="btn btn-secondary btn-block" style="padding:14px;font-size:15px;">Entrar com código</button>
+          <div style="color:oklch(66% 0.125 25);font-size:13px;margin-top:8px;min-height:16px;">{{ joinError }}</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isJoinName }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <h1 style="font-size:22px;margin:0 0 4px;">Quase lá!</h1>
+        <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Como o banco deve te chamar?</p>
+        <div class="card" style="padding:18px;">
+          <div class="field">
+            <label>Seu nome</label>
+            <input class="input" type="text" value="{{ joinNameInput }}" onChange="{{ setJoinName }}" placeholder="Ex: Victor" style="font-size:16px;min-height:44px;" />
+          </div>
+          <button onClick="{{ finalizeJoin }}" class="btn btn-primary btn-block" style="padding:15px;font-size:16px;">Entrar na Partida</button>
+          <div style="color:oklch(66% 0.125 25);font-size:13px;margin-top:8px;min-height:16px;">{{ joinNameError }}</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTerminal }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-right:110px;">
+          <span style="font-weight:700;font-size:15px;color:var(--color-accent);">🏦 Terminal do Banco</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <span class="tag tag-neutral">Código {{ bankCode }}</span>
+          <span onClick="{{ leaveTerminal }}" class="tag" style="border:1px solid oklch(66% 0.125 25);color:oklch(66% 0.125 25);cursor:pointer;">Sair</span>
+        </div>
+
+        <div class="card" style="padding:18px;text-align:center;margin-bottom:16px;">
+          <div style="font-size:11px;color:color-mix(in srgb, var(--color-text) 50%, transparent);margin-bottom:10px;">QR DE ENTRADA — jogador escaneia pra entrar</div>
+          <div ref="{{ terminalJoinQrRef }}" style="display:inline-block;padding:10px;background:#fff;border-radius:var(--radius-md);"></div>
+        </div>
+
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin-bottom:4px;">
+            <span>Jogadores: <b style="color:var(--color-text);">{{ playerCount }}</b></span>
+            <span>Em circulação: <b style="color:var(--color-text);">{{ totalCirc }}</b></span>
+          </div>
+          <sc-if value="{{ hasNoPlayers }}" hint-placeholder-val="{{ false }}">
+            <div class="text-muted" style="font-size:13px;text-align:center;padding:16px 0;">Nenhum jogador entrou ainda — mostre o QR acima 👆</div>
+          </sc-if>
+          <sc-for list="{{ players }}" as="p" hint-placeholder-count="3">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--color-divider);">
+              <span style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;">👤 {{ p.name }} <sc-if value="{{ p.pending }}" hint-placeholder-val="{{ false }}"><span class="tag" style="background:oklch(30% 0.06 150);color:oklch(85% 0.06 150);">aguardando</span></sc-if></span>
+              <span style="font-weight:700;color:var(--color-accent);">{{ p.balanceFormatted }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div onClick="{{ goBankPay }}" class="card" style="padding:20px 10px;text-align:center;cursor:pointer;align-items:center;">
+            <div style="font-size:30px;color:oklch(66% 0.125 25);">💸</div>
+            <div style="font-size:15px;font-weight:700;">Pagar</div>
+          </div>
+          <div onClick="{{ goBankReceive }}" class="card" style="padding:20px 10px;text-align:center;cursor:pointer;align-items:center;">
+            <div style="font-size:30px;color:oklch(66% 0.125 145);">📥</div>
+            <div style="font-size:15px;font-weight:700;">Receber</div>
           </div>
         </div>
-        <div id="term-charge-form">
-          <input id="term-charge-input" type="number" placeholder="Valor (G$)">
-          <button class="btn btn-green" onclick="generateBankCharge()" style="margin-top:10px; padding:12px; font-size:14px;">Gerar QR de cobrança</button>
+
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+          <b class="card-title" style="font-size:14px;">📜 Extrato da partida</b>
+          <sc-if value="{{ hasNoTx }}" hint-placeholder-val="{{ false }}">
+            <div class="text-muted" style="font-size:13px;text-align:center;padding:14px 0;">Sem transações ainda</div>
+          </sc-if>
+          <sc-for list="{{ transactions }}" as="t" hint-placeholder-count="3">
+            <div style="padding:9px 0;border-bottom:1px solid var(--color-divider);font-size:12px;display:flex;justify-content:space-between;gap:8px;">
+              <span style="opacity:.8;">{{ t.label }}</span>
+              <span style="font-weight:700;color:var(--color-accent);white-space:nowrap;">{{ t.amountFormatted }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <button onClick="{{ endGame }}" class="btn btn-block" style="padding:13px;font-size:14px;border:1px solid oklch(66% 0.125 25);color:oklch(66% 0.125 25);">Encerrar partida e apagar dados</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isBankReceive }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <button onClick="{{ backFromBankReceive }}" class="btn btn-ghost" style="padding-left:0;margin-bottom:16px;">‹ Voltar</button>
+        <h1 style="font-size:22px;margin:0 0 4px;">Cobrar de um jogador</h1>
+        <sc-if value="{{ bankChargeHasPending }}" hint-placeholder-val="{{ false }}">
+          <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Mostre esse QR pra quem vai te pagar.</p>
+          <div class="card" style="padding:18px;text-align:center;">
+            <div ref="{{ bankChargeQrRef }}" style="display:inline-block;padding:10px;background:#fff;border-radius:var(--radius-md);"></div>
+            <div style="font-size:28px;font-weight:800;color:oklch(66% 0.125 145);margin-top:12px;">{{ bankChargeAmountFormatted }}</div>
+            <button onClick="{{ cancelBankCharge }}" class="btn btn-secondary btn-block" style="padding:13px;font-size:14px;">Cancelar cobrança</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ bankChargeNoPending }}" hint-placeholder-val="{{ true }}">
+          <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Defina o valor que o banco quer receber.</p>
+          <div class="card" style="padding:18px;">
+            <div class="field">
+              <label>Valor ({{ currencySymbol }})</label>
+              <input class="input" type="number" value="{{ bankChargeAmountInput }}" onChange="{{ setBankChargeAmount }}" inputmode="numeric" placeholder="0" style="font-size:16px;min-height:44px;" />
+            </div>
+            <button onClick="{{ generateBankCharge }}" class="btn btn-block" style="padding:15px;font-size:16px;background:oklch(66% 0.125 145);color:var(--color-bg);border-color:oklch(66% 0.125 145);">Gerar QR</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isBankPay }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <button onClick="{{ backFromBankPay }}" class="btn btn-ghost" style="padding-left:0;margin-bottom:16px;">‹ Voltar</button>
+        <h1 style="font-size:22px;margin:0 0 4px;">Pagar a um jogador</h1>
+        <sc-if value="{{ bankPayHasSelection }}" hint-placeholder-val="{{ false }}">
+          <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Leia o QR mostrado pelo jogador e confirme.</p>
+          <div class="card" style="padding:18px;text-align:center;">
+            <div style="font-size:13px;color:color-mix(in srgb, var(--color-text) 60%, transparent);margin-bottom:8px;">{{ bankPaySelectedName }}</div>
+            <div ref="{{ bankPayQrRef }}" style="display:inline-block;padding:10px;background:#fff;border-radius:var(--radius-md);"></div>
+            <div style="font-size:28px;font-weight:800;color:oklch(66% 0.125 25);margin-top:12px;">{{ bankPaySelectedAmountFormatted }}</div>
+            <button onClick="{{ bankSimulateScan }}" class="btn btn-primary btn-block" style="padding:13px;font-size:14px;">{{ bankPayScanButtonLabel }}</button>
+            <button onClick="{{ bankConfirmPay }}" disabled="{{ bankPayConfirmDisabled }}" class="btn btn-block" style="padding:14px;font-size:15px;background:oklch(66% 0.125 25);color:var(--color-bg);border-color:oklch(66% 0.125 25);">Confirmar Pagamento</button>
+            <button onClick="{{ bankCancelPaySelection }}" class="btn btn-ghost" style="font-size:12px;margin-top:4px;">‹ Escolher outro</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ bankPayNoSelection }}" hint-placeholder-val="{{ true }}">
+          <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Escolha quem está cobrando.</p>
+          <sc-if value="{{ bankPayNoCandidates }}" hint-placeholder-val="{{ false }}">
+            <div class="card text-muted" style="padding:24px 16px;font-size:13px;text-align:center;">Nenhum jogador está cobrando no momento.</div>
+          </sc-if>
+          <div class="card" style="padding:8px;gap:2px;">
+            <sc-for list="{{ bankPayCandidates }}" as="p" hint-placeholder-count="2">
+              <div onClick="{{ p.onClick }}" style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:var(--radius-md);cursor:pointer;" style-hover="background:color-mix(in srgb, var(--color-text) 7%, transparent);">
+                <span style="font-weight:600;font-size:14px;">👤 {{ p.name }}</span>
+                <span style="font-size:13px;font-weight:700;color:oklch(66% 0.125 25);">{{ p.amountFormatted }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isWallet }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-right:110px;">
+          <span style="font-weight:700;font-size:15px;color:var(--color-accent);">🎲 Maquininha</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <span class="tag tag-neutral">Código {{ walletCode }}</span>
+          <span onClick="{{ leaveWallet }}" class="tag" style="border:1px solid oklch(66% 0.125 25);color:oklch(66% 0.125 25);cursor:pointer;">Sair</span>
+        </div>
+
+        <div class="elev-md" style="background:linear-gradient(135deg, var(--color-accent-900), var(--color-bg));border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:24px 22px;position:relative;overflow:hidden;margin-bottom:18px;">
+          <div style="position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 70%);"></div>
+          <div style="font-size:11px;letter-spacing:1.5px;color:var(--color-accent-400);font-weight:700;text-transform:uppercase;">Minha Carteira</div>
+          <div style="font-size:26px;margin:16px 0 4px;">🪙</div>
+          <div style="font-size:34px;font-weight:800;color:var(--color-neutral-100);margin:2px 0 12px;">{{ walletBalanceFormatted }}</div>
+          <div class="text-muted" style="font-size:14px;">👤 {{ walletPlayerName }}</div>
+        </div>
+
+        <sc-if value="{{ walletHasPending }}" hint-placeholder-val="{{ false }}">
+          <div style="background:oklch(26% 0.05 150);border:1px solid oklch(38% 0.08 150);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:16px;font-size:13px;">
+            <span>⏳ Aguardando receber <b>{{ walletPendingAmountFormatted }}</b></span>
+          </div>
+        </sc-if>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
+          <div onClick="{{ goPay }}" class="card" style="padding:20px 10px;text-align:center;cursor:pointer;align-items:center;">
+            <div style="font-size:30px;color:oklch(66% 0.125 25);">💸</div>
+            <div style="font-size:15px;font-weight:700;">Pagar</div>
+          </div>
+          <div onClick="{{ goReceive }}" class="card" style="padding:20px 10px;text-align:center;cursor:pointer;align-items:center;">
+            <div style="font-size:30px;color:oklch(66% 0.125 145);">📥</div>
+            <div style="font-size:15px;font-weight:700;">Receber</div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px;">
+          <b class="card-title" style="font-size:14px;">📜 Extrato</b>
+          <sc-if value="{{ walletHasNoTx }}" hint-placeholder-val="{{ false }}">
+            <div class="text-muted" style="font-size:13px;text-align:center;padding:14px 0;">Sem transações ainda</div>
+          </sc-if>
+          <sc-for list="{{ walletTx }}" as="t" hint-placeholder-count="3">
+            <div style="padding:9px 0;border-bottom:1px solid var(--color-divider);font-size:13px;display:flex;justify-content:space-between;">
+              <span>{{ t.label }}</span>
+              <span style="font-weight:700;color:{{ t.color }};">{{ t.signedAmount }}</span>
+            </div>
+          </sc-for>
         </div>
       </div>
+    </sc-if>
 
-      <div class="card">
-        <b>💸 Pagar a um jogador</b>
-        <p class="sub" style="margin:4px 0 10px;">Leia o QR de quem está cobrando.</p>
-        <div id="term-pay-selection" style="display:none;"></div>
-        <div id="term-pay-candidates"></div>
+    <sc-if value="{{ isReceive }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <button onClick="{{ backFromReceive }}" class="btn btn-ghost" style="padding-left:0;margin-bottom:16px;">‹ Voltar</button>
+        <h1 style="font-size:22px;margin:0 0 4px;">Receber</h1>
+        <sc-if value="{{ receiveHasPending }}" hint-placeholder-val="{{ false }}">
+          <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Mostre esse QR pra quem vai te pagar.</p>
+          <div class="card" style="padding:18px;text-align:center;">
+            <div ref="{{ receiveQrRef }}" style="display:inline-block;padding:10px;background:#fff;border-radius:var(--radius-md);"></div>
+            <div style="font-size:28px;font-weight:800;color:oklch(66% 0.125 145);margin-top:12px;">{{ receivePendingAmountFormatted }}</div>
+            <button onClick="{{ cancelReceive }}" class="btn btn-secondary btn-block" style="padding:13px;font-size:14px;">Cancelar cobrança</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ receiveNoPending }}" hint-placeholder-val="{{ true }}">
+          <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Defina o valor que você quer receber.</p>
+          <div class="card" style="padding:18px;">
+            <div class="field">
+              <label>Valor ({{ currencySymbol }})</label>
+              <input class="input" type="number" value="{{ receiveAmountInput }}" onChange="{{ setReceiveAmount }}" inputmode="numeric" placeholder="0" style="font-size:16px;min-height:44px;" />
+            </div>
+            <button onClick="{{ generateReceive }}" class="btn btn-primary btn-block" style="padding:15px;font-size:16px;">Gerar QR</button>
+          </div>
+        </sc-if>
       </div>
+    </sc-if>
 
-      <div class="card">
-        <b>📜 Extrato completo da partida</b>
-        <div id="term-log"></div>
+    <sc-if value="{{ isPayPick }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <button onClick="{{ backFromPayPick }}" class="btn btn-ghost" style="padding-left:0;margin-bottom:16px;">‹ Voltar</button>
+        <h1 style="font-size:22px;margin:0 0 4px;">Pagar</h1>
+        <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Escolha quem está cobrando e leia o QR dele.</p>
+        <sc-if value="{{ payPickEmpty }}" hint-placeholder-val="{{ false }}">
+          <div class="card text-muted" style="padding:24px 16px;font-size:13px;text-align:center;">Ninguém está cobrando no momento. Peça pra quem vai receber tocar em "Receber" e gerar o QR.</div>
+        </sc-if>
+        <div class="card" style="padding:8px;gap:2px;">
+          <sc-for list="{{ payPickList }}" as="t" hint-placeholder-count="3">
+            <div onClick="{{ t.onClick }}" style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:var(--radius-md);cursor:pointer;" style-hover="background:color-mix(in srgb, var(--color-text) 7%, transparent);">
+              <span style="font-weight:600;font-size:14px;">{{ t.icon }} {{ t.name }}</span>
+              <span style="font-size:12px;color:{{ t.subColor }};">{{ t.subLabel }}</span>
+            </div>
+          </sc-for>
+        </div>
       </div>
+    </sc-if>
 
-      <button class="btn btn-secondary" style="border-color:var(--red); color:var(--red);" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
-    </div>
+    <sc-if value="{{ isPayConfirm }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <button onClick="{{ backFromPayConfirm }}" class="btn btn-ghost" style="padding-left:0;margin-bottom:16px;">‹ Voltar</button>
+        <h1 style="font-size:22px;margin:0 0 4px;">Pagar {{ payTargetName }}</h1>
+
+        <p class="text-muted" style="font-size:14px;margin:0 0 20px;">Leia o QR mostrado pelo destinatário e confira o valor.</p>
+        <div class="card" style="padding:18px;text-align:center;">
+          <div ref="{{ payConfirmQrRef }}" style="display:inline-block;padding:10px;background:#fff;border-radius:var(--radius-md);"></div>
+          <div style="font-size:28px;font-weight:800;color:oklch(66% 0.125 25);margin-top:12px;">{{ payFixedAmountFormatted }}</div>
+          <button onClick="{{ simulateScanPay }}" class="btn btn-primary btn-block" style="padding:13px;font-size:14px;">{{ scanButtonLabel }}</button>
+          <button onClick="{{ confirmPay }}" disabled="{{ payConfirmDisabled }}" class="btn btn-block" style="padding:14px;font-size:15px;background:oklch(66% 0.125 25);color:var(--color-bg);border-color:oklch(66% 0.125 25);">Confirmar Pagamento</button>
+        </div>
+        <div style="color:oklch(66% 0.125 25);font-size:13px;margin-top:10px;">{{ payError }}</div>
+      </div>
+    </sc-if>
+
   </div>
-
-  <div class="screen" id="screen-wallet">
-    <div class="topbar">
-      <span class="bank-badge">🎲 Maquininha</span>
-      <div class="row" style="gap:6px;">
-        <span class="pill" id="wallet-code-pill"></span>
-        <span class="pill pill-link" onclick="leaveSession()">Sair</span>
-      </div>
-    </div>
-
-    <div class="wallet-card">
-      <div class="wallet-card-brand">Minha Carteira</div>
-      <div class="wallet-card-chip">🪙</div>
-      <div class="balance" id="wallet-balance">G$ 0</div>
-      <div class="wallet-card-name" id="wallet-name-pill">👤</div>
-    </div>
-
-    <div class="pending-banner" id="wallet-pending-banner" style="display:none;">
-      ⏳ Aguardando receber <b id="wallet-pending-amount"></b>
-    </div>
-
-    <div class="action-row">
-      <div class="action-btn pay" onclick="openPayFlow()">
-        <span class="action-btn-icon">💸</span>
-        <span class="action-btn-label">Pagar</span>
-      </div>
-      <div class="action-btn receive" onclick="openReceiveFlow()">
-        <span class="action-btn-icon">📥</span>
-        <span class="action-btn-label">Receber</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <b>📜 Extrato</b>
-      <div id="wallet-log"></div>
-    </div>
-  </div>
-
-  <div class="screen" id="screen-receive">
-    <button class="btn btn-ghost" onclick="showScreen('screen-wallet')">‹ Voltar</button>
-    <h1>Receber</h1>
-    <div id="receive-pending" style="display:none;">
-      <p class="sub">Mostre esse QR pra quem vai te pagar.</p>
-      <div class="card center">
-        <div id="my-qr" class="qr-box"></div>
-        <div style="font-size:28px;font-weight:800;color:var(--green);margin-top:12px;" id="receive-amount-display"></div>
-        <button class="btn btn-secondary" onclick="cancelReceive()" style="margin-top:16px;">Cancelar cobrança</button>
-      </div>
-    </div>
-    <div id="receive-form">
-      <p class="sub">Defina o valor que você quer receber.</p>
-      <div class="card">
-        <label>Valor (G$)</label>
-        <input id="receive-amount" type="number" inputmode="numeric" placeholder="0">
-        <button class="btn btn-green" onclick="generateReceive()" style="margin-top:14px;">Gerar QR</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="screen" id="screen-pay-pick">
-    <button class="btn btn-ghost" onclick="showScreen('screen-wallet')">‹ Voltar</button>
-    <h1>Pagar</h1>
-    <p class="sub">Escolha quem está cobrando e leia o QR dele — ou escaneie direto.</p>
-    <div class="card center" style="margin-bottom:14px;">
-      <button class="btn btn-primary" onclick="beginPayScan()">📷 Escanear QR de quem vai receber</button>
-    </div>
-    <div id="pay-pick-list"></div>
-  </div>
-
-  <div class="screen" id="screen-scan">
-    <button class="btn btn-ghost" onclick="stopScanAndBack()">‹ Cancelar</button>
-    <h1 id="scan-title">Aproxime o QR</h1>
-    <p class="sub" id="scan-sub"></p>
-    <div class="card scan-wrap">
-      <video id="scan-video" playsinline muted></video>
-      <div class="scan-frame"></div>
-    </div>
-    <div class="sub center" id="scan-status" style="margin-top:-8px;"></div>
-    <div class="err" id="scan-err"></div>
-    <div id="scan-join-fallback" style="display:none;">
-      <button class="btn btn-secondary" onclick="showScreen('screen-join-intro')">Digitar código da partida em vez disso</button>
-    </div>
-  </div>
-
-  <div class="screen" id="screen-pay-confirm">
-    <button class="btn btn-ghost" onclick="showScreen('screen-wallet')">‹ Voltar</button>
-    <h1 id="pay-confirm-title">Pagar</h1>
-    <p class="sub">Confira o valor lido do QR e confirme.</p>
-    <div class="card center">
-      <div style="font-size:32px;font-weight:800;color:var(--red);" id="pay-confirm-amount"></div>
-      <button class="btn btn-red" onclick="confirmPay()" style="margin-top:16px;">Confirmar Pagamento</button>
-    </div>
-    <div class="err" id="pay-confirm-err"></div>
-  </div>
-
 </div>
 
-<script>
-/* ---------- Backend: Supabase ---------- */
-const SUPABASE_URL = "https://bhhermoidcwneygiafnr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoaGVybW9pZGN3bmV5Z2lhZm5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NDY4NTMsImV4cCI6MjEwMTMyMjg1M30.FnCXxf_NBrs8hqQvz7B_MwE6mtuqeTnaaHER2y5orL0";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;: 402, &quot;height&quot;: 874},
+  &quot;currencySymbol&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;G$&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Jogo&quot;},
+  &quot;defaultStartingBalance&quot;: {&quot;editor&quot;: &quot;int&quot;, &quot;default&quot;: 4000, &quot;min&quot;: 0, &quot;step&quot;: 100, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Jogo&quot;},
+  &quot;maxPlayers&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 8, &quot;min&quot;: 2, &quot;max&quot;: 8, &quot;step&quot;: 1, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Jogo&quot;},
+  &quot;soundEnabled&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Jogo&quot;}
+}">
+class Component extends DCLogic {
+  state = {
+    screen: 'home',
+    bank: null,
+    viewRole: null,
+    viewPlayerId: null,
+    createBalanceInput: null,
+    manualCodeInput: '',
+    joinPendingCode: null,
+    joinNameInput: '',
+    joinError: '',
+    joinNameError: '',
+    roleMenuOpen: false,
+    bankChargeAmountInput: '',
+    bankPaySelectedId: null,
+    bankPayScanned: false,
+    receiveAmountInput: '',
+    payTargetId: null,
+    payTargetName: '',
+    payScanned: false,
+    payError: '',
+    successMessage: null,
+    successColor: null
+  };
 
-const JOIN_PREFIX = "BIMJOIN|";
-const PAY_PREFIX = "BIMPAY|";
-let scanStream = null, scanRAF = null, scanMode = null; // 'join' | 'pay'
-let pendingJoinCode = null, pendingPayTarget = null; // {id,name,amount}
-let pollTimer = null, selectedBankPayTarget = null;
+  _lastWalletPlayerId = null;
+  _lastWalletBalance = null;
+  _lastTermTxIds = null;
 
-async function loadRoom(code){
-  try{
-    const { data, error } = await sb.from('bim_rooms').select('data').eq('code', code).maybeSingle();
-    if(error) throw error;
-    return data ? data.data : null;
-  }catch(e){ console.error('loadRoom falhou', e); return null; }
-}
-async function saveRoom(room){
-  const { error } = await sb.from('bim_rooms').upsert({ code: room.code, data: room, updated_at: new Date().toISOString() });
-  if(error){ console.error('saveRoom falhou', error); throw error; }
-}
-async function deleteRoom(code){ try{ await sb.from('bim_rooms').delete().eq('code', code); }catch(e){ console.error('deleteRoom falhou', e); } }
-function genCode(){ const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c=""; for(let i=0;i<5;i++) c+=chars[Math.floor(Math.random()*chars.length)]; return c; }
-function genId(){ return Math.random().toString(36).slice(2,10); }
-function fmt(n){ return 'G$ ' + Math.round(n).toLocaleString('pt-BR'); }
-function ding(){ try{ if(navigator.vibrate) navigator.vibrate(35); }catch(e){} }
-let successTimer = null;
-function showSuccess(msg, color){
-  const ov = document.getElementById('success-overlay');
-  const circle = ov.querySelector('.success-circle');
-  document.getElementById('success-message').textContent = msg;
-  circle.style.borderColor = color; circle.querySelector('svg').style.color = color;
-  ov.classList.remove('show'); void ov.offsetWidth; ov.classList.add('show');
-  ding();
-  clearTimeout(successTimer);
-  successTimer = setTimeout(()=>{ ov.classList.remove('show'); }, 1700);
-}
+  joinIntroQrRef = React.createRef();
+  terminalJoinQrRef = React.createRef();
+  receiveQrRef = React.createRef();
+  payConfirmQrRef = React.createRef();
+  bankChargeQrRef = React.createRef();
+  bankPayQrRef = React.createRef();
 
-function getSession(){ try{ return JSON.parse(localStorage.getItem('bim-session')||'null'); }catch(e){ return null; } }
-function setSession(s){ localStorage.setItem('bim-session', JSON.stringify(s)); }
-function clearSession(){ localStorage.removeItem('bim-session'); }
-function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function setBusy(btnId, busy, labelBusy, labelIdle){ const btn=document.getElementById(btnId); if(!btn) return; btn.textContent = busy?labelBusy:labelIdle; if(busy) btn.setAttribute('disabled','true'); else btn.removeAttribute('disabled'); }
-function escapeHtml(str){ return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-
-/* ---------- Terminal (Bank) ---------- */
-async function createRoomFlow(){
-  const errEl = document.getElementById('create-err'); errEl.textContent='';
-  setBusy('create-btn', true, 'Criando…', 'Criar Partida');
-  try{
-    const balance = parseInt(document.getElementById('create-balance').value) || 4000;
-    const code = genCode();
-    const room = { code, initialBalance: balance, players: [], transactions: [], pendingRequest: null, createdAt: Date.now() };
-    await saveRoom(room);
-    setSession({ role:'terminal', roomCode: code });
-    await enterTerminal(code);
-  }catch(e){ errEl.textContent = 'Não foi possível criar a partida. Verifique sua internet e tente de novo.'; }
-  finally{ setBusy('create-btn', false, 'Criando…', 'Criar Partida'); }
-}
-let termKnownTxIds = null;
-async function enterTerminal(code){
-  termKnownTxIds = null;
-  showScreen('screen-terminal'); switchTermTab('jogadores');
-  document.getElementById('term-code-pill').textContent = code;
-  document.getElementById('term-qr-join').innerHTML = '';
-  new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+code, width:190, height:190, correctLevel: QRCode.CorrectLevel.L });
-  await refreshTerminal();
-  clearInterval(pollTimer); pollTimer = setInterval(refreshTerminal, 2000);
-}
-function switchTermTab(tab){
-  document.getElementById('term-tab-jogadores').style.display = tab==='jogadores' ? '' : 'none';
-  document.getElementById('term-tab-operacao').style.display = tab==='operacao' ? '' : 'none';
-  document.getElementById('tabbtn-jogadores').classList.toggle('active', tab==='jogadores');
-  document.getElementById('tabbtn-operacao').classList.toggle('active', tab==='operacao');
-}
-async function refreshTerminal(){
-  const s = getSession(); if(!s || s.role!=='terminal') return;
-  const room = await loadRoom(s.roomCode); if(!room) return;
-  document.getElementById('term-player-count').textContent = room.players.length;
-  document.getElementById('term-total-circ').textContent = fmt(room.players.reduce((sum,p)=>sum+p.balance,0));
-  const list = document.getElementById('term-players');
-  list.innerHTML = room.players.length===0 ? '<div class="empty">Nenhum jogador entrou ainda — mostre o QR de entrada 👆</div>' :
-    room.players.map(p=>`<div class="player-row"><span class="player-name">👤 ${escapeHtml(p.name)} ${p.pendingRequest?'<span class="tag tag-waiting">aguardando</span>':''}</span><span class="player-bal">${fmt(p.balance)}</span></div>`).join('');
-
-  const chargePending = document.getElementById('term-charge-pending');
-  const chargeForm = document.getElementById('term-charge-form');
-  if(room.pendingRequest){
-    chargePending.style.display=''; chargeForm.style.display='none';
-    document.getElementById('term-qr-charge').innerHTML='';
-    new QRCode(document.getElementById('term-qr-charge'), { text: PAY_PREFIX+room.code+'|BANK|'+room.pendingRequest.amount, width:150, height:150, correctLevel: QRCode.CorrectLevel.L });
-    document.getElementById('term-charge-amount').textContent = fmt(room.pendingRequest.amount);
-  } else { chargePending.style.display='none'; chargeForm.style.display=''; }
-
-  const candidates = room.players.filter(p=>p.pendingRequest);
-  const candEl = document.getElementById('term-pay-candidates');
-  const selEl = document.getElementById('term-pay-selection');
-  if(selectedBankPayTarget){
-    const t = room.players.find(p=>p.id===selectedBankPayTarget);
-    if(t && t.pendingRequest){
-      selEl.style.display=''; candEl.style.display='none';
-      selEl.innerHTML = `<div class="center"><div class="sub" style="margin-bottom:8px;">👤 ${escapeHtml(t.name)}</div>
-        <div id="term-qr-pay-target" class="qr-box"></div>
-        <div style="font-size:24px;font-weight:800;color:var(--red);margin-top:10px;">${fmt(t.pendingRequest.amount)}</div>
-        <button class="btn btn-red" onclick="bankConfirmPay('${t.id}')" style="margin-top:10px;padding:12px;font-size:14px;">Confirmar Pagamento</button>
-        <button class="btn btn-ghost" onclick="bankCancelPaySelection()" style="margin-top:4px;">‹ Escolher outro</button>
-      </div>`;
-      new QRCode(document.getElementById('term-qr-pay-target'), { text: PAY_PREFIX+room.code+'|'+t.id+'|'+t.pendingRequest.amount, width:150, height:150, correctLevel: QRCode.CorrectLevel.L });
-    } else { selectedBankPayTarget=null; }
+  genCode() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let c = "";
+    for (let i = 0; i < 5; i++) c += chars[Math.floor(Math.random() * chars.length)];
+    return c;
   }
-  if(!selectedBankPayTarget){
-    selEl.style.display='none'; candEl.style.display='';
-    candEl.innerHTML = candidates.length===0 ? '<div class="empty">Nenhum jogador está cobrando no momento.</div>' :
-      candidates.map(p=>`<div class="op-player-row" onclick="bankSelectPayCandidate('${p.id}')"><span class="player-name">👤 ${escapeHtml(p.name)}</span><span class="player-bal" style="color:var(--red);">${fmt(p.pendingRequest.amount)}</span></div>`).join('');
+  genId() { return Math.random().toString(36).slice(2, 10); }
+  fmt(n) { return this.props.currencySymbol + ' ' + Math.round(n).toLocaleString('pt-BR'); }
+  ding() {
+    if (this.props.soundEnabled === false) return;
+    try { if (navigator.vibrate) navigator.vibrate(35); } catch (e) {}
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880; g.gain.value = 0.05;
+      o.start(); o.stop(ctx.currentTime + 0.1);
+    } catch (e) {}
+  }
+  showSuccess(msg, color) {
+    clearTimeout(this._successTimer);
+    this.setState({ successMessage: msg, successColor: color });
+    this.ding();
+    this._successTimer = setTimeout(() => this.setState({ successMessage: null }), 1700);
+  }
+  renderQrInto(ref, text, size) {
+    if (!ref.current || typeof QRCode === 'undefined') return;
+    ref.current.innerHTML = '';
+    new QRCode(ref.current, { text, width: size || 170, height: size || 170, correctLevel: QRCode.CorrectLevel.L });
   }
 
-  const log = document.getElementById('term-log');
-  const txs = [...room.transactions].reverse().slice(0,30);
-  log.innerHTML = txs.length ? txs.map(t=>`<div class="tx"><span style="opacity:.8;">${t.fromId==='BANK'?'🏦 Banco':escapeHtml(t.fromName)} → ${t.toId==='BANK'?'🏦 Banco':escapeHtml(t.toName)}</span><span style="font-weight:700;color:var(--accent);white-space:nowrap;">${fmt(t.amount)}</span></div>`).join('') : '<div class="empty">Sem transações ainda</div>';
-  if(termKnownTxIds === null){ termKnownTxIds = new Set(room.transactions.map(t=>t.id)); }
-  else{
-    const newReceived = room.transactions.find(t => !termKnownTxIds.has(t.id) && t.toId==='BANK');
-    if(newReceived) showSuccess('Cobrança recebida 💰 de ' + newReceived.fromName, 'var(--green)');
-    room.transactions.forEach(t=>termKnownTxIds.add(t.id));
+  go(screen) { this.setState({ screen, roleMenuOpen: false }); }
+  goHome() { this.go('home'); }
+  goBank() { this.go('bankSetup'); }
+  goJoin() { this.setState({ screen: 'joinIntro', joinError: '' }); }
+
+  createBank() {
+    const balance = parseInt(this.state.createBalanceInput) || this.props.defaultStartingBalance || 4000;
+    const code = this.genCode();
+    const bank = { code, initialBalance: balance, players: [], transactions: [], pendingRequest: null };
+    this.setState({ bank, viewRole: 'bank', viewPlayerId: null, screen: 'terminal' });
   }
-}
-function bankSelectPayCandidate(id){ selectedBankPayTarget = id; refreshTerminal(); }
-function bankCancelPaySelection(){ selectedBankPayTarget = null; refreshTerminal(); }
-async function generateBankCharge(){
-  const amount = parseInt(document.getElementById('term-charge-input').value);
-  if(!amount || amount<=0) return;
-  const s = getSession(); const room = await loadRoom(s.roomCode); if(!room) return;
-  room.pendingRequest = { amount, ts: Date.now() };
-  ding(); document.getElementById('term-charge-input').value='';
-  await saveRoom(room); await refreshTerminal();
-}
-async function cancelBankCharge(){
-  const s = getSession(); const room = await loadRoom(s.roomCode); if(!room) return;
-  room.pendingRequest = null; await saveRoom(room); await refreshTerminal();
-}
-async function bankConfirmPay(playerId){
-  const s = getSession(); const room = await loadRoom(s.roomCode); if(!room) return;
-  const p = room.players.find(x=>x.id===playerId); if(!p || !p.pendingRequest) return;
-  const amount = p.pendingRequest.amount;
-  p.balance += amount;
-  room.transactions.push({ id:genId(), fromId:'BANK', fromName:'Banco', toId:p.id, toName:p.name, amount, ts:Date.now() });
-  p.pendingRequest = null; selectedBankPayTarget=null;
-  await saveRoom(room); await refreshTerminal();
-  showSuccess('Pagamento enviado ✅ para ' + p.name, 'var(--red)');
-}
-async function resetGameFlow(){
-  if(!confirm('Encerrar a partida e apagar todos os dados? Essa ação não pode ser desfeita.')) return;
-  const s = getSession(); clearInterval(pollTimer);
-  await deleteRoom(s.roomCode); clearSession(); showScreen('screen-home');
-}
-function leaveSession(){
-  const s = getSession();
-  const msg = s && s.role==='terminal' ? 'Sair do terminal? A partida continua ativa.' : 'Sair da carteira? Você vai precisar escanear o QR de novo pra voltar a jogar.';
-  if(!confirm(msg)) return;
-  clearInterval(pollTimer); clearSession(); showScreen('screen-home');
-}
 
-/* ---------- Join ---------- */
-function beginJoinScan(){
-  scanMode='join';
-  document.getElementById('scan-title').textContent='Escaneie o QR do Banco';
-  document.getElementById('scan-sub').textContent='Aponte a câmera pro "QR DE ENTRADA" mostrado no terminal.';
-  document.getElementById('scan-err').textContent='';
-  document.getElementById('scan-join-fallback').style.display='';
-  showScreen('screen-scan'); startScanner();
-}
-async function handleJoinScanResult(code){
-  document.getElementById('scan-err').textContent='Verificando partida…';
-  const room = await loadRoom(code);
-  if(!room){ document.getElementById('scan-err').textContent='Partida não encontrada.'; startScanner(); return; }
-  stopScanner(); goToJoinName(code);
-}
-async function manualJoinByCode(){
-  const errEl = document.getElementById('join-manual-err');
-  const code = document.getElementById('join-manual-code').value.trim().toUpperCase();
-  if(!code || code.length<4){ errEl.textContent='Digite o código informado pelo banco.'; return; }
-  errEl.textContent='Verificando partida…';
-  const room = await loadRoom(code);
-  if(!room){ errEl.textContent='Partida não encontrada.'; return; }
-  errEl.textContent=''; goToJoinName(code);
-}
-function goToJoinName(code){ pendingJoinCode=code; document.getElementById('join-name').value=''; document.getElementById('join-name-err').textContent=''; showScreen('screen-join-name'); }
-async function finalizeJoin(){
-  const name = document.getElementById('join-name').value.trim();
-  const errEl = document.getElementById('join-name-err');
-  if(!name){ errEl.textContent='Digite seu nome.'; return; }
-  errEl.textContent=''; setBusy('join-name-btn', true, 'Entrando…', 'Entrar na Partida');
-  try{
-    const room = await loadRoom(pendingJoinCode);
-    if(!room){ errEl.textContent='Essa partida não existe mais.'; return; }
-    if(room.players.length >= 8){ errEl.textContent='Limite de jogadores atingido.'; return; }
-    const id = genId();
-    room.players.push({ id, name, balance: room.initialBalance, pendingRequest: null });
-    await saveRoom(room);
-    setSession({ role:'player', roomCode: pendingJoinCode, playerId: id, playerName: name });
-    await enterWallet();
-  }catch(e){ errEl.textContent='Não foi possível entrar. Tente de novo.'; }
-  finally{ setBusy('join-name-btn', false, 'Entrando…', 'Entrar na Partida'); }
-}
-
-/* ---------- Wallet ---------- */
-let walletKnownTxIds = null;
-async function enterWallet(){ walletKnownTxIds = null; showScreen('screen-wallet'); await refreshWallet(); clearInterval(pollTimer); pollTimer=setInterval(refreshWallet,2000); }
-async function refreshWallet(){
-  const s = getSession(); if(!s || s.role!=='player') return;
-  const room = await loadRoom(s.roomCode); if(!room) return;
-  const p = room.players.find(x=>x.id===s.playerId); if(!p) return;
-  document.getElementById('wallet-name-pill').textContent = '👤 '+p.name;
-  document.getElementById('wallet-code-pill').textContent = s.roomCode;
-  document.getElementById('wallet-balance').textContent = fmt(p.balance);
-  const banner = document.getElementById('wallet-pending-banner');
-  if(p.pendingRequest){ banner.style.display=''; document.getElementById('wallet-pending-amount').textContent = fmt(p.pendingRequest.amount); }
-  else banner.style.display='none';
-  const mine = [...room.transactions].filter(t=>t.fromId===p.id || t.toId===p.id).reverse().slice(0,25);
-  if(walletKnownTxIds === null){ walletKnownTxIds = new Set(mine.map(t=>t.id)); }
-  else{
-    const newReceived = mine.find(t => !walletKnownTxIds.has(t.id) && t.toId===p.id);
-    if(newReceived) showSuccess('Pagamento recebido 💰 de ' + (newReceived.fromId==='BANK'?'Banco':newReceived.fromName), 'var(--green)');
-    mine.forEach(t=>walletKnownTxIds.add(t.id));
+  simulateJoinScan() {
+    if (!this.state.bank) { this.setState({ joinError: 'Nenhuma partida ativa ainda.' }); return; }
+    this.setState({ joinPendingCode: this.state.bank.code, screen: 'joinName', joinNameError: '' });
   }
-  const log = document.getElementById('wallet-log');
-  log.innerHTML = mine.length ? mine.map(t=>{
-    const out = t.fromId===p.id;
-    return `<div class="tx"><span>${out?'Para '+(t.toId==='BANK'?'Banco':escapeHtml(t.toName)):'De '+(t.fromId==='BANK'?'Banco':escapeHtml(t.fromName))}</span><span class="${out?'amt-out':'amt-in'}">${out?'-':'+'} ${fmt(t.amount)}</span></div>`;
-  }).join('') : '<div class="empty">Sem transações ainda</div>';
-}
-
-/* ---------- Receive (define value, gera QR) ---------- */
-async function openReceiveFlow(){
-  const s = getSession(); const room = await loadRoom(s.roomCode); if(!room) return;
-  const p = room.players.find(x=>x.id===s.playerId);
-  showScreen('screen-receive'); renderReceiveScreen(p);
-}
-function renderReceiveScreen(p){
-  const pending = document.getElementById('receive-pending'), form = document.getElementById('receive-form');
-  if(p && p.pendingRequest){
-    pending.style.display=''; form.style.display='none';
-    document.getElementById('my-qr').innerHTML='';
-    const s = getSession();
-    new QRCode(document.getElementById('my-qr'), { text: PAY_PREFIX+s.roomCode+'|'+p.id+'|'+p.pendingRequest.amount, width:180, height:180, correctLevel: QRCode.CorrectLevel.L });
-    document.getElementById('receive-amount-display').textContent = fmt(p.pendingRequest.amount);
-  } else { pending.style.display='none'; form.style.display=''; document.getElementById('receive-amount').value=''; }
-}
-async function generateReceive(){
-  const amount = parseInt(document.getElementById('receive-amount').value);
-  if(!amount || amount<=0) return;
-  const s = getSession(); const room = await loadRoom(s.roomCode); if(!room) return;
-  const p = room.players.find(x=>x.id===s.playerId);
-  p.pendingRequest = { amount, ts: Date.now() };
-  ding(); await saveRoom(room); renderReceiveScreen(p);
-}
-async function cancelReceive(){
-  const s = getSession(); const room = await loadRoom(s.roomCode); if(!room) return;
-  const p = room.players.find(x=>x.id===s.playerId);
-  p.pendingRequest = null; await saveRoom(room); showScreen('screen-wallet'); await refreshWallet();
-}
-
-/* ---------- Pay (sempre lê QR de uma cobrança ativa) ---------- */
-async function openPayFlow(){
-  showScreen('screen-pay-pick');
-  const s = getSession(); const room = await loadRoom(s.roomCode); if(!room) return;
-  const list = [];
-  if(room.pendingRequest) list.push({ id:'BANK', name:'Banco', icon:'🏦', amount:room.pendingRequest.amount });
-  room.players.filter(p=>p.id!==s.playerId && p.pendingRequest).forEach(p=>list.push({ id:p.id, name:p.name, icon:'👤', amount:p.pendingRequest.amount }));
-  const el = document.getElementById('pay-pick-list');
-  el.innerHTML = list.length===0 ? '<div class="card empty">Ninguém está cobrando no momento. Peça pra quem vai receber tocar em "Receber" e gerar o QR.</div>' :
-    '<div class="card" style="padding:8px;">'+list.map(t=>`<div class="op-player-row" onclick="selectPayTargetFromList('${t.id}','${escapeHtml(t.name)}',${t.amount})">
-      <span class="player-name">${t.icon} ${escapeHtml(t.name)}</span><span class="player-bal" style="color:var(--red);">${fmt(t.amount)}</span></div>`).join('')+'</div>';
-}
-function selectPayTargetFromList(id, name, amount){ pendingPayTarget = { id, name, amount }; showPayConfirm(); }
-function beginPayScan(){
-  scanMode='pay';
-  document.getElementById('scan-title').textContent='Aproxime o QR';
-  document.getElementById('scan-sub').textContent='Aponte a câmera pro QR de quem vai receber.';
-  document.getElementById('scan-err').textContent='';
-  document.getElementById('scan-join-fallback').style.display='none';
-  showScreen('screen-scan'); startScanner();
-}
-async function handlePayScanResult(roomCode, targetId, amount){
-  const s = getSession();
-  if(roomCode !== s.roomCode){ document.getElementById('scan-err').textContent='Esse QR é de outra partida.'; startScanner(); return; }
-  if(targetId === s.playerId){ document.getElementById('scan-err').textContent='Você não pode pagar pra si mesmo.'; startScanner(); return; }
-  let targetName = 'Banco';
-  if(targetId !== 'BANK'){
-    const room = await loadRoom(s.roomCode);
-    if(!room){ document.getElementById('scan-err').textContent='Sem conexão.'; startScanner(); return; }
-    const p = room.players.find(x=>x.id===targetId);
-    if(!p || !p.pendingRequest){ document.getElementById('scan-err').textContent='Essa cobrança não existe mais.'; startScanner(); return; }
-    targetName = p.name;
+  manualJoin() {
+    const code = (this.state.manualCodeInput || '').trim().toUpperCase();
+    if (!this.state.bank || code !== this.state.bank.code) {
+      this.setState({ joinError: 'Partida não encontrada. Confira o código com o banco.' });
+      return;
+    }
+    this.setState({ joinPendingCode: code, screen: 'joinName', joinError: '', joinNameError: '' });
   }
-  stopScanner();
-  pendingPayTarget = { id: targetId, name: targetName, amount: parseInt(amount) };
-  showPayConfirm();
-}
-function showPayConfirm(){
-  document.getElementById('pay-confirm-title').textContent = 'Pagar ' + pendingPayTarget.name;
-  document.getElementById('pay-confirm-amount').textContent = fmt(pendingPayTarget.amount);
-  document.getElementById('pay-confirm-err').textContent = '';
-  showScreen('screen-pay-confirm');
-}
-async function confirmPay(){
-  const s = getSession(); const room = await loadRoom(s.roomCode);
-  const errEl = document.getElementById('pay-confirm-err');
-  if(!room){ errEl.textContent='Sem conexão com o servidor.'; return; }
-  const me = room.players.find(x=>x.id===s.playerId);
-  const targetId = pendingPayTarget.id; const amount = pendingPayTarget.amount;
-  let actualAmount = amount;
-  if(targetId==='BANK'){ if(!room.pendingRequest){ errEl.textContent='Cobrança não encontrada.'; return; } actualAmount = room.pendingRequest.amount; }
-  else { const t = room.players.find(x=>x.id===targetId); if(!t || !t.pendingRequest){ errEl.textContent='Cobrança não encontrada.'; return; } actualAmount = t.pendingRequest.amount; }
-  if(actualAmount > me.balance){ errEl.textContent='Saldo insuficiente.'; return; }
-  me.balance -= actualAmount;
-  if(targetId==='BANK') room.pendingRequest = null;
-  else { const t = room.players.find(x=>x.id===targetId); t.balance += actualAmount; t.pendingRequest = null; }
-  room.transactions.push({ id:genId(), fromId:me.id, fromName:me.name, toId:targetId, toName:pendingPayTarget.name, amount:actualAmount, ts:Date.now() });
-  await saveRoom(room);
-  showScreen('screen-wallet'); await refreshWallet();
-  showSuccess('Pagamento enviado ✅', 'var(--red)');
-}
+  finalizeJoin() {
+    const name = (this.state.joinNameInput || '').trim();
+    if (!name) { this.setState({ joinNameError: 'Digite seu nome.' }); return; }
+    const bank = this.state.bank;
+    const maxP = this.props.maxPlayers || 8;
+    if (bank.players.length >= maxP) { this.setState({ joinNameError: 'Limite de jogadores atingido.' }); return; }
+    const id = this.genId();
+    bank.players.push({ id, name, balance: bank.initialBalance, pendingRequest: null });
+    this.setState({ bank, viewRole: 'player', viewPlayerId: id, screen: 'wallet' });
+  }
 
-/* ---------- Generic QR scanner ---------- */
-async function getCameraStream(){
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('sem suporte a câmera (precisa de HTTPS)');
-  const attempts = [{ video:{ facingMode:{ideal:'environment'} } }, { video:true }];
-  let lastErr=null;
-  for(const c of attempts){ try{ return await navigator.mediaDevices.getUserMedia(c); }catch(e){ lastErr=e; } }
-  throw lastErr;
-}
-async function startScanner(){
-  const video = document.getElementById('scan-video'), errEl = document.getElementById('scan-err'), statusEl = document.getElementById('scan-status');
-  errEl.textContent=''; if(statusEl) statusEl.textContent='Carregando câmera…';
-  if(typeof jsQR !== 'function'){ errEl.textContent='Não foi possível carregar o leitor de QR. Recarregue a página.'; if(statusEl) statusEl.textContent=''; return; }
-  try{
-    scanStream = await getCameraStream(); video.srcObject = scanStream; await video.play();
-    if(statusEl) statusEl.textContent = '🔎 Procurando QR…';
-    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d', { willReadFrequently:true });
-    let frames = 0;
-    const tick = () => {
-      if(!scanStream) return;
-      if(video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0){
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-        let code = null;
-        try{ code = jsQR(img.data, img.width, img.height, { inversionAttempts:'attemptBoth' }); }catch(err){}
-        frames++;
-        if(statusEl && frames % 30 === 0) statusEl.textContent = '🔎 Procurando QR… (aproxime e centralize)';
-        if(code && code.data){
-          if(scanMode==='join' && code.data.startsWith(JOIN_PREFIX)){ handleJoinScanResult(code.data.slice(JOIN_PREFIX.length)); return; }
-          if(scanMode==='pay' && code.data.startsWith(PAY_PREFIX)){
-            const parts = code.data.slice(PAY_PREFIX.length).split('|'); // [roomCode, targetId, amount]
-            handlePayScanResult(parts[0], parts[1], parts[2]); return;
-          }
+  toggleRoleMenu() { this.setState(s => ({ roleMenuOpen: !s.roleMenuOpen })); }
+  switchToBank() { this.setState({ viewRole: 'bank', viewPlayerId: null, screen: 'terminal', roleMenuOpen: false }); }
+  switchToPlayer(id) { this.setState({ viewRole: 'player', viewPlayerId: id, screen: 'wallet', roleMenuOpen: false }); }
+
+  leaveSession() { this.setState({ viewRole: null, viewPlayerId: null, screen: 'home' }); }
+
+  goBankReceive() { this.setState({ screen: 'bankReceive' }); }
+  goBankPay() { this.setState({ screen: 'bankPay' }); }
+  backFromBankReceive() { this.setState({ screen: 'terminal' }); }
+  backFromBankPay() { this.setState({ screen: 'terminal', bankPaySelectedId: null, bankPayScanned: false }); }
+
+  executePayment(fromId, fromName, toId, toName, amount, desc) {
+    const bank = this.state.bank;
+    if (fromId !== 'BANK') {
+      const p = bank.players.find(x => x.id === fromId);
+      if (!p) return false;
+      if (amount > p.balance) { this.setState({ payError: 'Saldo insuficiente.' }); return false; }
+      p.balance -= amount;
+    }
+    if (toId !== 'BANK') {
+      const p = bank.players.find(x => x.id === toId);
+      if (p) p.balance += amount;
+    }
+    bank.transactions.push({ id: this.genId(), fromId, fromName, toId, toName, amount, desc: desc || '', ts: Date.now() });
+    this.ding();
+    this.setState({ bank });
+    return true;
+  }
+  setBankChargeAmount(e) { this.setState({ bankChargeAmountInput: e.target.value }); }
+  generateBankCharge() {
+    const amount = parseInt(this.state.bankChargeAmountInput);
+    if (!amount || amount <= 0) return;
+    const bank = this.state.bank;
+    bank.pendingRequest = { amount, ts: Date.now() };
+    this.ding();
+    this.setState({ bank, bankChargeAmountInput: '' });
+  }
+  cancelBankCharge() {
+    const bank = this.state.bank;
+    bank.pendingRequest = null;
+    this.setState({ bank });
+  }
+  bankSelectPayCandidate(id) { this.setState({ bankPaySelectedId: id, bankPayScanned: false }); }
+  bankCancelPaySelection() { this.setState({ bankPaySelectedId: null, bankPayScanned: false }); }
+  bankSimulateScan() { this.setState({ bankPayScanned: true }); }
+  bankConfirmPay() {
+    const bank = this.state.bank;
+    const target = bank.players.find(x => x.id === this.state.bankPaySelectedId);
+    if (!target || !target.pendingRequest) return;
+    const amount = target.pendingRequest.amount;
+    const ok = this.executePayment('BANK', 'Banco', target.id, target.name, amount, '');
+    if (!ok) return;
+    target.pendingRequest = null;
+    this.setState({ bank, bankPaySelectedId: null, bankPayScanned: false });
+    this.showSuccess('Pagamento enviado ✅ para ' + target.name, 'oklch(66% 0.125 25)');
+  }
+  endGame() {
+    if (!confirm('Encerrar a partida e apagar todos os dados? Essa ação não pode ser desfeita.')) return;
+    this.setState({ bank: null, viewRole: null, viewPlayerId: null, screen: 'home' });
+  }
+
+  generateReceive() {
+    const amount = parseInt(this.state.receiveAmountInput);
+    if (!amount || amount <= 0) return;
+    const bank = this.state.bank;
+    const p = bank.players.find(x => x.id === this.state.viewPlayerId);
+    p.pendingRequest = { amount, ts: Date.now() };
+    this.ding();
+    this.setState({ bank, receiveAmountInput: '' });
+  }
+  cancelReceive() {
+    const bank = this.state.bank;
+    const p = bank.players.find(x => x.id === this.state.viewPlayerId);
+    p.pendingRequest = null;
+    this.setState({ bank, screen: 'wallet' });
+  }
+
+  pickPayTarget(id, name) {
+    this.setState({ payTargetId: id, payTargetName: name, screen: 'payConfirm', payScanned: false, payError: '' });
+  }
+
+  simulateScanPay() { this.setState({ payScanned: true }); }
+
+  confirmPay() {
+    const bank = this.state.bank;
+    const me = bank.players.find(x => x.id === this.state.viewPlayerId);
+    const targetId = this.state.payTargetId;
+    const targetName = this.state.payTargetName;
+    let amount;
+    if (targetId === 'BANK') amount = bank.pendingRequest ? bank.pendingRequest.amount : undefined;
+    else {
+      const target = bank.players.find(x => x.id === targetId);
+      amount = target && target.pendingRequest ? target.pendingRequest.amount : undefined;
+    }
+    if (!amount) { this.setState({ payError: 'Cobrança não encontrada.' }); return; }
+    const ok = this.executePayment(me.id, me.name, targetId, targetName, amount, '');
+    if (!ok) return;
+    if (targetId === 'BANK') bank.pendingRequest = null;
+    else { const target = bank.players.find(x => x.id === targetId); if (target) target.pendingRequest = null; }
+    this.setState({ screen: 'wallet', bank });
+    this.showSuccess('Pagamento enviado ✅', 'oklch(66% 0.125 25)');
+  }
+
+  componentDidUpdate() {
+    const s = this.state;
+    if (s.screen === 'wallet' && s.bank && s.viewPlayerId) {
+      const p = s.bank.players.find(x => x.id === s.viewPlayerId);
+      if (p) {
+        if (this._lastWalletPlayerId !== s.viewPlayerId) { this._lastWalletPlayerId = s.viewPlayerId; this._lastWalletBalance = p.balance; }
+        else if (this._lastWalletBalance !== null && p.balance > this._lastWalletBalance) {
+          this.showSuccess('Pagamento recebido 💰', 'oklch(66% 0.125 145)');
         }
+        this._lastWalletBalance = p.balance;
       }
-      scanRAF = requestAnimationFrame(tick);
+    } else { this._lastWalletPlayerId = null; this._lastWalletBalance = null; }
+    if (s.screen === 'terminal' && s.bank) {
+      const ids = s.bank.transactions.map(t => t.id);
+      if (this._lastTermTxIds === null) { this._lastTermTxIds = new Set(ids); }
+      else {
+        const newReceived = s.bank.transactions.find(t => !this._lastTermTxIds.has(t.id) && t.toId === 'BANK');
+        if (newReceived) this.showSuccess('Cobrança recebida 💰 de ' + newReceived.fromName, 'oklch(66% 0.125 145)');
+        ids.forEach(id => this._lastTermTxIds.add(id));
+      }
+    } else { this._lastTermTxIds = null; }
+    if (s.screen === 'joinIntro' && s.bank) this.renderQrInto(this.joinIntroQrRef, 'BIMJOIN|' + s.bank.code, 150);
+    if (s.screen === 'terminal' && s.bank) this.renderQrInto(this.terminalJoinQrRef, 'BIMJOIN|' + s.bank.code, 180);
+    if (s.screen === 'receive' && s.bank) {
+      const p = s.bank.players.find(x => x.id === s.viewPlayerId);
+      if (p && p.pendingRequest) this.renderQrInto(this.receiveQrRef, 'BIMPAY|' + s.bank.code + '|' + p.id + '|' + p.pendingRequest.amount, 170);
+    }
+    if (s.screen === 'payConfirm' && s.bank) {
+      if (s.payTargetId === 'BANK' && s.bank.pendingRequest) this.renderQrInto(this.payConfirmQrRef, 'BIMPAY|' + s.bank.code + '|BANK|' + s.bank.pendingRequest.amount, 150);
+      else if (s.payTargetId !== 'BANK') {
+        const target = s.bank.players.find(x => x.id === s.payTargetId);
+        if (target && target.pendingRequest) this.renderQrInto(this.payConfirmQrRef, 'BIMPAY|' + s.bank.code + '|' + target.id + '|' + target.pendingRequest.amount, 150);
+      }
+    }
+    if (s.screen === 'bankReceive' && s.bank && s.bank.pendingRequest) this.renderQrInto(this.bankChargeQrRef, 'BIMPAY|' + s.bank.code + '|BANK|' + s.bank.pendingRequest.amount, 170);
+    if (s.screen === 'bankPay' && s.bank && s.bankPaySelectedId) {
+      const target = s.bank.players.find(x => x.id === s.bankPaySelectedId);
+      if (target && target.pendingRequest) this.renderQrInto(this.bankPayQrRef, 'BIMPAY|' + s.bank.code + '|' + target.id + '|' + target.pendingRequest.amount, 150);
+    }
+  }
+
+  renderVals() {
+    const s = this.state;
+    const bank = s.bank;
+    const fmt = (n) => this.fmt(n);
+
+    const vals = {
+      currencySymbol: this.props.currencySymbol || 'G$',
+      isHome: s.screen === 'home',
+      isBankSetup: s.screen === 'bankSetup',
+      isJoinIntro: s.screen === 'joinIntro',
+      isJoinName: s.screen === 'joinName',
+      isTerminal: s.screen === 'terminal',
+      isBankReceive: s.screen === 'bankReceive',
+      isBankPay: s.screen === 'bankPay',
+      isWallet: s.screen === 'wallet',
+      isReceive: s.screen === 'receive',
+      isPayPick: s.screen === 'payPick',
+      isPayConfirm: s.screen === 'payConfirm',
+      goHome: () => this.goHome(),
+      goBank: () => this.goBank(),
+      goJoin: () => this.goJoin(),
+      createBalanceInput: s.createBalanceInput === null ? (this.props.defaultStartingBalance || 4000) : s.createBalanceInput,
+      setCreateBalance: (e) => this.setState({ createBalanceInput: e.target.value }),
+      createBank: () => this.createBank(),
+      bankExists: !!bank,
+      bankMissing: !bank,
+      bankCode: bank ? bank.code : '',
+      joinIntroQrRef: this.joinIntroQrRef,
+      simulateJoinScan: () => this.simulateJoinScan(),
+      manualCodeInput: s.manualCodeInput,
+      setManualCode: (e) => this.setState({ manualCodeInput: e.target.value }),
+      manualJoin: () => this.manualJoin(),
+      joinError: s.joinError,
+      joinNameInput: s.joinNameInput,
+      setJoinName: (e) => this.setState({ joinNameInput: e.target.value }),
+      finalizeJoin: () => this.finalizeJoin(),
+      joinNameError: s.joinNameError,
+
+      showRoleSwitch: !!bank && !!s.viewRole,
+      roleMenuOpen: s.roleMenuOpen,
+      toggleRoleMenu: () => this.toggleRoleMenu(),
+      roleSwitchLabel: s.viewRole === 'bank' ? '🏦 Banco' : (bank && s.viewPlayerId ? '👤 ' + (bank.players.find(p => p.id === s.viewPlayerId) || {}).name : ''),
+      switchToBank: () => this.switchToBank(),
+      switchablePlayers: bank ? bank.players.map(p => ({ id: p.id, name: p.name, onClick: () => this.switchToPlayer(p.id) })) : [],
+
+      leaveTerminal: () => this.leaveSession(),
+      leaveWallet: () => this.leaveSession(),
+
+      goBankReceive: () => this.goBankReceive(),
+      goBankPay: () => this.goBankPay(),
+      backFromBankReceive: () => this.backFromBankReceive(),
+      backFromBankPay: () => this.backFromBankPay(),
+      terminalJoinQrRef: this.terminalJoinQrRef,
+      playerCount: bank ? bank.players.length : 0,
+      totalCirc: bank ? fmt(bank.players.reduce((sum, p) => sum + p.balance, 0)) : fmt(0),
+      hasNoPlayers: !bank || bank.players.length === 0,
+      players: bank ? bank.players.map(p => ({ name: p.name, balanceFormatted: fmt(p.balance), pending: !!p.pendingRequest })) : [],
+      bankChargeHasPending: !!(bank && bank.pendingRequest),
+      bankChargeNoPending: !(bank && bank.pendingRequest),
+      bankChargeAmountInput: s.bankChargeAmountInput,
+      setBankChargeAmount: (e) => this.setState({ bankChargeAmountInput: e.target.value }),
+      generateBankCharge: () => this.generateBankCharge(),
+      cancelBankCharge: () => this.cancelBankCharge(),
+      bankChargeQrRef: this.bankChargeQrRef,
+      bankChargeAmountFormatted: bank && bank.pendingRequest ? fmt(bank.pendingRequest.amount) : '',
+      bankPayHasSelection: !!s.bankPaySelectedId,
+      bankPayNoSelection: !s.bankPaySelectedId,
+      bankPayCandidates: bank ? bank.players.filter(p => p.pendingRequest).map(p => ({ name: p.name, amountFormatted: fmt(p.pendingRequest.amount), onClick: () => this.bankSelectPayCandidate(p.id) })) : [],
+      bankPayNoCandidates: !bank || bank.players.filter(p => p.pendingRequest).length === 0,
+      bankPaySelectedName: (() => { if (!bank || !s.bankPaySelectedId) return ''; const t = bank.players.find(x => x.id === s.bankPaySelectedId); return t ? '👤 ' + t.name : ''; })(),
+      bankPaySelectedAmountFormatted: (() => { if (!bank || !s.bankPaySelectedId) return ''; const t = bank.players.find(x => x.id === s.bankPaySelectedId); return t && t.pendingRequest ? fmt(t.pendingRequest.amount) : ''; })(),
+      bankPayQrRef: this.bankPayQrRef,
+      bankPayScanButtonLabel: s.bankPayScanned ? '✅ QR lido' : '📷 Simular leitura do QR',
+      bankPayConfirmDisabled: !s.bankPayScanned,
+      bankSimulateScan: () => this.bankSimulateScan(),
+      bankConfirmPay: () => this.bankConfirmPay(),
+      bankCancelPaySelection: () => this.bankCancelPaySelection(),
+      hasNoTx: !bank || bank.transactions.length === 0,
+      transactions: bank ? [...bank.transactions].reverse().slice(0, 30).map(t => ({
+        label: (t.fromId === 'BANK' ? '🏦 Banco' : t.fromName) + ' → ' + (t.toId === 'BANK' ? '🏦 Banco' : t.toName) + (t.desc ? ' · ' + t.desc : ''),
+        amountFormatted: fmt(t.amount)
+      })) : [],
+      endGame: () => this.endGame(),
+
+      walletCode: bank ? bank.code : '',
+      walletPlayerName: bank && s.viewPlayerId ? (bank.players.find(p => p.id === s.viewPlayerId) || {}).name : '',
+      walletBalanceFormatted: bank && s.viewPlayerId ? fmt((bank.players.find(p => p.id === s.viewPlayerId) || { balance: 0 }).balance) : fmt(0),
+      walletHasPending: !!(bank && s.viewPlayerId && (bank.players.find(p => p.id === s.viewPlayerId) || {}).pendingRequest),
+      walletPendingAmountFormatted: (() => {
+        if (!bank || !s.viewPlayerId) return '';
+        const p = bank.players.find(x => x.id === s.viewPlayerId);
+        return p && p.pendingRequest ? fmt(p.pendingRequest.amount) : '';
+      })(),
+      goPay: () => this.go('payPick'),
+      goReceive: () => this.go('receive'),
+      walletHasNoTx: !bank || !s.viewPlayerId || bank.transactions.filter(t => t.fromId === s.viewPlayerId || t.toId === s.viewPlayerId).length === 0,
+      walletTx: bank && s.viewPlayerId ? [...bank.transactions].filter(t => t.fromId === s.viewPlayerId || t.toId === s.viewPlayerId).reverse().slice(0, 25).map(t => {
+        const out = t.fromId === s.viewPlayerId;
+        return {
+          label: (out ? 'Para ' + (t.toId === 'BANK' ? 'Banco' : t.toName) : 'De ' + (t.fromId === 'BANK' ? 'Banco' : t.fromName)) + (t.desc ? ' · ' + t.desc : ''),
+          signedAmount: (out ? '- ' : '+ ') + fmt(t.amount),
+          color: out ? 'oklch(66% 0.125 25)' : 'var(--color-accent)'
+        };
+      }) : [],
+
+      receiveHasPending: !!(bank && s.viewPlayerId && (bank.players.find(p => p.id === s.viewPlayerId) || {}).pendingRequest),
+      receiveNoPending: !(bank && s.viewPlayerId && (bank.players.find(p => p.id === s.viewPlayerId) || {}).pendingRequest),
+      receiveAmountInput: s.receiveAmountInput,
+      setReceiveAmount: (e) => this.setState({ receiveAmountInput: e.target.value }),
+      generateReceive: () => this.generateReceive(),
+      receiveQrRef: this.receiveQrRef,
+      receivePendingAmountFormatted: (() => {
+        if (!bank || !s.viewPlayerId) return '';
+        const p = bank.players.find(x => x.id === s.viewPlayerId);
+        return p && p.pendingRequest ? fmt(p.pendingRequest.amount) : '';
+      })(),
+      cancelReceive: () => this.cancelReceive(),
+      backFromReceive: () => this.go('wallet'),
+
+      payPickList: bank && s.viewPlayerId ? (() => {
+        const list = [];
+        if (bank.pendingRequest) list.push({ id: 'BANK', name: 'Banco', icon: '🏦', subLabel: 'cobrando ' + fmt(bank.pendingRequest.amount), subColor: 'oklch(66% 0.125 25)', onClick: () => this.pickPayTarget('BANK', 'Banco') });
+        bank.players.filter(p => p.id !== s.viewPlayerId && p.pendingRequest).forEach(p => {
+          list.push({ id: p.id, name: p.name, icon: '👤', subLabel: 'cobrando ' + fmt(p.pendingRequest.amount), subColor: 'oklch(66% 0.125 25)', onClick: () => this.pickPayTarget(p.id, p.name) });
+        });
+        return list;
+      })() : [],
+      payPickEmpty: !(bank && ((bank.pendingRequest) || bank.players.some(p => p.id !== s.viewPlayerId && p.pendingRequest))),
+      backFromPayPick: () => this.go('wallet'),
+
+      payTargetName: s.payTargetName,
+      payFixedAmountFormatted: (() => {
+        if (!bank) return '';
+        if (s.payTargetId === 'BANK') return bank.pendingRequest ? fmt(bank.pendingRequest.amount) : '';
+        const t = bank.players.find(x => x.id === s.payTargetId);
+        return t && t.pendingRequest ? fmt(t.pendingRequest.amount) : '';
+      })(),
+      payConfirmQrRef: this.payConfirmQrRef,
+      scanButtonLabel: s.payScanned ? '✅ QR lido' : '📷 Simular leitura do QR',
+      payConfirmDisabled: !s.payScanned,
+      simulateScanPay: () => this.simulateScanPay(),
+      confirmPay: () => this.confirmPay(),
+      payError: s.payError,
+      backFromPayConfirm: () => this.go('wallet'),
+      hasSuccess: !!s.successMessage,
+      successMessage: s.successMessage,
+      successColor: s.successColor
     };
-    scanRAF = requestAnimationFrame(tick);
-  }catch(e){
-    console.error('Câmera falhou', e); if(statusEl) statusEl.textContent='';
-    if(e && e.name==='NotAllowedError') errEl.textContent='Permissão de câmera negada.';
-    else if(e && e.name==='NotFoundError') errEl.textContent='Nenhuma câmera encontrada neste dispositivo.';
-    else errEl.textContent='Não foi possível acessar a câmera (' + (e&&e.message?e.message:'erro') + ').';
+    return vals;
   }
 }
-function stopScanner(){ if(scanRAF) cancelAnimationFrame(scanRAF); if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } }
-function stopScanAndBack(){ stopScanner(); showScreen(scanMode==='join' ? 'screen-join-intro' : 'screen-pay-pick'); }
 
-/* ---------- Resume session ---------- */
-(async function init(){
-  const s = getSession(); if(!s) return;
-  if(s.role==='terminal'){ const room = await loadRoom(s.roomCode); if(room) enterTerminal(s.roomCode); else clearSession(); }
-  else if(s.role==='player'){ const room = await loadRoom(s.roomCode); if(room && room.players.find(p=>p.id===s.playerId)) enterWallet(); else clearSession(); }
-})();
 </script>
 </body>
 </html>
