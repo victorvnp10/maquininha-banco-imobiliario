@@ -329,8 +329,6 @@
       </div>
     </div>
 
-    <button class="btn btn-secondary" id="wallet-also-bank-btn" onclick="becomeBankToo()" style="margin-bottom:14px; display:none;">🏦 Também administrar esta partida</button>
-
     <div class="card">
       <b>📜 Extrato</b>
       <div id="wallet-log"></div>
@@ -495,17 +493,6 @@ async function becomePlayerToo(){
   await saveRoom(room);
   s.playerId = id; s.playerName = name; s.activeView = 'player'; setSession(s);
   await enterWallet();
-}
-async function becomeBankToo(){
-  const s = getSession(); if(!s || s.isBank || !s.playerId) return;
-  const room = await loadRoom(s.roomCode); if(!room){ alert('Sem conexão.'); return; }
-  if(!confirm('Virar também o banco desta partida neste aparelho?')) return;
-  s.isBank = true; setSession(s);
-  termKnownTxIds = null;
-  document.getElementById('term-code-pill').textContent = s.roomCode;
-  document.getElementById('term-qr-join').innerHTML = '';
-  new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+s.roomCode, width:190, height:190, correctLevel: QRCode.CorrectLevel.L });
-  await refreshTerminal(); updateDualBar();
 }
 function switchTermTab(tab){
   document.getElementById('term-tab-jogadores').style.display = tab==='jogadores' ? '' : 'none';
