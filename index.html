@@ -136,6 +136,10 @@
   .boot-status{position:fixed; top:0; left:0; right:0; background:var(--accent); color:var(--bg); font-size:12px;
     text-align:center; padding:6px; z-index:999; display:none;}
   .pending-banner{background:var(--green-bg); border:1px solid var(--green-border); border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:13px;}
+  .dual-bar{display:none; position:sticky; top:0; z-index:400; background:var(--bg); padding:12px 20px 0; max-width:420px; margin:0 auto; width:100%; box-sizing:border-box;}
+  .dual-bar .seg{margin-bottom:0;}
+  .dual-bar .seg-opt.bank.active{background:var(--accent-d); color:var(--accent-l);}
+  .dual-bar .seg-opt.player.active{background:var(--green-bg); color:var(--green);}
   .success-overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
     background:rgba(22,24,38,.92); opacity:0; pointer-events:none; transition:opacity .25s; z-index:500;}
   .success-overlay.show{opacity:1; pointer-events:auto;}
@@ -155,6 +159,12 @@
     <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </div>
   <div id="success-message"></div>
+</div>
+<div id="dual-bar" class="dual-bar">
+  <div class="seg">
+    <div class="seg-opt bank" id="dualtab-bank" onclick="switchActiveView('bank')">🏦 Banco</div>
+    <div class="seg-opt player" id="dualtab-player" onclick="switchActiveView('player')">👤 Jogador</div>
+  </div>
 </div>
 <div id="app">
 
@@ -232,6 +242,7 @@
           <span>Em circulação: <b id="term-total-circ" style="color:var(--text);">G$ 0</b></span>
         </div>
         <div id="term-players"></div>
+        <button class="btn btn-secondary" id="term-also-player-btn" onclick="becomePlayerToo()" style="margin-top:10px; display:none;">🎮 Também jogar nesta partida</button>
       </div>
     </div>
 
@@ -320,6 +331,8 @@
         <span class="action-btn-label">Receber</span>
       </div>
     </div>
+
+    <button class="btn btn-secondary" id="wallet-also-bank-btn" onclick="becomeBankToo()" style="margin-bottom:14px; display:none;">🏦 Também administrar esta partida</button>
 
     <div class="card">
       <b>📜 Extrato</b>
@@ -442,7 +455,7 @@ async function createRoomFlow(){
     const code = genCode();
     const room = { code, initialBalance: balance, players: [], transactions: [], pendingRequest: null, createdAt: Date.now() };
     await saveRoom(room);
-    setSession({ role:'terminal', roomCode: code });
+    setSession({ roomCode: code, isBank:true, playerId:null, playerName:null, activeView:'bank' });
     await enterTerminal(code);
   }catch(e){ errEl.textContent = 'Não foi possível criar a partida. Verifique sua internet e tente de novo.'; }
   finally{ setBusy('create-btn', false, 'Criando…', 'Criar Partida'); }
@@ -456,6 +469,48 @@ async function enterTerminal(code){
   new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+code, width:190, height:190, correctLevel: QRCode.CorrectLevel.L });
   await refreshTerminal();
   clearInterval(pollTimer); pollTimer = setInterval(refreshTerminal, 2000);
+  updateDualBar();
+}
+function updateDualBar(){
+  const s = getSession();
+  const bar = document.getElementById('dual-bar');
+  if(s && s.isBank && s.playerId){
+    bar.style.display='';
+    document.getElementById('dualtab-bank').classList.toggle('active', s.activeView==='bank');
+    document.getElementById('dualtab-player').classList.toggle('active', s.activeView==='player');
+  } else if(bar) { bar.style.display='none'; }
+  const btnP = document.getElementById('term-also-player-btn'); if(btnP) btnP.style.display = (s && s.isBank && !s.playerId) ? '' : 'none';
+  const btnB = document.getElementById('wallet-also-bank-btn'); if(btnB) btnB.style.display = (s && s.playerId && !s.isBank) ? '' : 'none';
+}
+function switchActiveView(view){
+  const s = getSession(); if(!s) return;
+  s.activeView = view; setSession(s);
+  if(view==='bank'){ showScreen('screen-terminal'); clearInterval(pollTimer); pollTimer=setInterval(refreshTerminal,2000); refreshTerminal(); }
+  else { showScreen('screen-wallet'); clearInterval(pollTimer); pollTimer=setInterval(refreshWallet,2000); refreshWallet(); }
+  updateDualBar();
+}
+async function becomePlayerToo(){
+  const s = getSession(); if(!s || !s.isBank) return;
+  const name = (prompt('Seu nome como jogador:') || '').trim();
+  if(!name) return;
+  const room = await loadRoom(s.roomCode); if(!room){ alert('Sem conexão.'); return; }
+  if(room.players.length >= 8){ alert('Limite de jogadores atingido.'); return; }
+  const id = genId();
+  room.players.push({ id, name, balance: room.initialBalance, pendingRequest: null });
+  await saveRoom(room);
+  s.playerId = id; s.playerName = name; setSession(s);
+  await refreshTerminal(); updateDualBar();
+}
+async function becomeBankToo(){
+  const s = getSession(); if(!s || s.isBank || !s.playerId) return;
+  const room = await loadRoom(s.roomCode); if(!room){ alert('Sem conexão.'); return; }
+  if(!confirm('Virar também o banco desta partida neste aparelho?')) return;
+  s.isBank = true; setSession(s);
+  termKnownTxIds = null;
+  document.getElementById('term-code-pill').textContent = s.roomCode;
+  document.getElementById('term-qr-join').innerHTML = '';
+  new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+s.roomCode, width:190, height:190, correctLevel: QRCode.CorrectLevel.L });
+  await refreshTerminal(); updateDualBar();
 }
 function switchTermTab(tab){
   document.getElementById('term-tab-jogadores').style.display = tab==='jogadores' ? '' : 'none';
@@ -466,7 +521,7 @@ function switchTermTab(tab){
 function renderBankReceiveScreen(){ refreshTerminal(); }
 function renderBankPayScreen(){ refreshTerminal(); }
 async function refreshTerminal(){
-  const s = getSession(); if(!s || s.role!=='terminal') return;
+  const s = getSession(); if(!s || !s.isBank) return;
   const room = await loadRoom(s.roomCode); if(!room) return;
   document.getElementById('term-player-count').textContent = room.players.length;
   document.getElementById('term-total-circ').textContent = fmt(room.players.reduce((sum,p)=>sum+p.balance,0));
@@ -554,9 +609,13 @@ async function resetGameFlow(){
 }
 function leaveSession(){
   const s = getSession();
-  const msg = s && s.role==='terminal' ? 'Sair do terminal? A partida continua ativa.' : 'Sair da carteira? Você vai precisar escanear o QR de novo pra voltar a jogar.';
+  let msg;
+  if(s && s.isBank && s.playerId) msg = 'Sair de tudo? Você deixa de ser banco e jogador neste aparelho. A partida continua ativa.';
+  else if(s && s.isBank) msg = 'Sair do terminal? A partida continua ativa.';
+  else msg = 'Sair da carteira? Você vai precisar escanear o QR de novo pra voltar a jogar.';
   if(!confirm(msg)) return;
   clearInterval(pollTimer); clearSession(); showScreen('screen-home');
+  const bar = document.getElementById('dual-bar'); if(bar) bar.style.display='none';
 }
 
 /* ---------- Join ---------- */
@@ -596,7 +655,7 @@ async function finalizeJoin(){
     const id = genId();
     room.players.push({ id, name, balance: room.initialBalance, pendingRequest: null });
     await saveRoom(room);
-    setSession({ role:'player', roomCode: pendingJoinCode, playerId: id, playerName: name });
+    setSession({ roomCode: pendingJoinCode, isBank:false, playerId: id, playerName: name, activeView:'player' });
     await enterWallet();
   }catch(e){ errEl.textContent='Não foi possível entrar. Tente de novo.'; }
   finally{ setBusy('join-name-btn', false, 'Entrando…', 'Entrar na Partida'); }
@@ -604,9 +663,9 @@ async function finalizeJoin(){
 
 /* ---------- Wallet ---------- */
 let walletKnownTxIds = null;
-async function enterWallet(){ walletKnownTxIds = null; showScreen('screen-wallet'); await refreshWallet(); clearInterval(pollTimer); pollTimer=setInterval(refreshWallet,2000); }
+async function enterWallet(){ walletKnownTxIds = null; showScreen('screen-wallet'); await refreshWallet(); clearInterval(pollTimer); pollTimer=setInterval(refreshWallet,2000); updateDualBar(); }
 async function refreshWallet(){
-  const s = getSession(); if(!s || s.role!=='player') return;
+  const s = getSession(); if(!s || !s.playerId) return;
   const room = await loadRoom(s.roomCode); if(!room) return;
   const p = room.players.find(x=>x.id===s.playerId); if(!p) return;
   document.getElementById('wallet-name-pill').textContent = '👤 '+p.name;
@@ -775,8 +834,16 @@ function stopScanAndBack(){ stopScanner(); showScreen(scanMode==='join' ? 'scree
 /* ---------- Resume session ---------- */
 (async function init(){
   const s = getSession(); if(!s) return;
-  if(s.role==='terminal'){ const room = await loadRoom(s.roomCode); if(room) enterTerminal(s.roomCode); else clearSession(); }
-  else if(s.role==='player'){ const room = await loadRoom(s.roomCode); if(room && room.players.find(p=>p.id===s.playerId)) enterWallet(); else clearSession(); }
+  const room = await loadRoom(s.roomCode);
+  if(!room){ clearSession(); return; }
+  if(s.playerId && !room.players.find(p=>p.id===s.playerId)){
+    if(s.isBank){ s.playerId=null; s.playerName=null; if(s.activeView==='player') s.activeView='bank'; setSession(s); }
+    else { clearSession(); return; }
+  }
+  if(s.activeView==='player' && s.playerId) await enterWallet();
+  else if(s.isBank) await enterTerminal(s.roomCode);
+  else if(s.playerId) await enterWallet();
+  else clearSession();
 })();
 </script>
 </body>
