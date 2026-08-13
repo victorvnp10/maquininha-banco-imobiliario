@@ -248,6 +248,12 @@
       </div>
 
       <div class="card">
+        <b>👥 Jogadores ativos</b>
+        <p class="sub" style="margin:4px 0 0;">Só o banco vê o saldo de todos.</p>
+        <div id="term-op-players"></div>
+      </div>
+
+      <div class="card">
         <b>📜 Extrato completo da partida</b>
         <div id="term-log"></div>
       </div>
@@ -313,11 +319,6 @@
         <span class="action-btn-icon">📥</span>
         <span class="action-btn-label">Receber</span>
       </div>
-    </div>
-
-    <div class="card">
-      <b>👥 Jogadores ativos</b>
-      <div id="wallet-players-list"></div>
     </div>
 
     <div class="card">
@@ -472,6 +473,9 @@ async function refreshTerminal(){
   const list = document.getElementById('term-players');
   list.innerHTML = room.players.length===0 ? '<div class="empty">Nenhum jogador entrou ainda — mostre o QR de entrada 👆</div>' :
     room.players.map(p=>`<div class="player-row"><span class="player-name">👤 ${escapeHtml(p.name)} ${p.pendingRequest?'<span class="tag tag-waiting">aguardando</span>':''}</span><span class="player-bal">${fmt(p.balance)}</span></div>`).join('');
+  const opList = document.getElementById('term-op-players');
+  if(opList) opList.innerHTML = room.players.length===0 ? '<div class="empty">Nenhum jogador entrou ainda.</div>' :
+    room.players.map(p=>`<div class="player-row"><span class="player-name">👤 ${escapeHtml(p.name)} ${p.pendingRequest?'<span class="tag tag-waiting">aguardando</span>':''}</span><span class="player-bal">${fmt(p.balance)}</span></div>`).join('');
 
   const chargePending = document.getElementById('term-charge-pending');
   const chargeForm = document.getElementById('term-charge-form');
@@ -611,8 +615,6 @@ async function refreshWallet(){
   const banner = document.getElementById('wallet-pending-banner');
   if(p.pendingRequest){ banner.style.display=''; document.getElementById('wallet-pending-amount').textContent = fmt(p.pendingRequest.amount); }
   else banner.style.display='none';
-  const plist = document.getElementById('wallet-players-list');
-  plist.innerHTML = room.players.map(pl=>`<div class="player-row"><span class="player-name">${pl.id===p.id?'⭐':'👤'} ${escapeHtml(pl.name)} ${pl.pendingRequest?'<span class="tag tag-waiting">aguardando</span>':''}</span><span class="player-bal">${fmt(pl.balance)}</span></div>`).join('');
   const mine = [...room.transactions].filter(t=>t.fromId===p.id || t.toId===p.id).reverse().slice(0,25);
   if(walletKnownTxIds === null){ walletKnownTxIds = new Set(mine.map(t=>t.id)); }
   else{
