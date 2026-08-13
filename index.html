@@ -216,36 +216,44 @@
       </div>
     </div>
 
-    <div class="card center">
-      <div class="sub" style="margin-bottom:10px;">QR DE ENTRADA — o jogador escaneia pra se cadastrar na partida</div>
-      <div id="term-qr-join"></div>
+    <div class="seg">
+      <div class="seg-opt active" id="tabbtn-jogadores" onclick="switchTermTab('jogadores')">👥 Jogadores</div>
+      <div class="seg-opt" id="tabbtn-operacao" onclick="switchTermTab('operacao')">💰 Operação</div>
     </div>
 
-    <div class="action-row">
-      <div class="action-btn pay" onclick="showScreen('screen-bank-pay'); renderBankPayScreen();">
-        <span class="action-btn-icon">💸</span>
-        <span class="action-btn-label">Pagar</span>
+    <div id="term-tab-jogadores" class="term-tab">
+      <div class="card center">
+        <div class="sub" style="margin-bottom:10px;">QR DE ENTRADA — o jogador escaneia pra se cadastrar na partida</div>
+        <div id="term-qr-join"></div>
       </div>
-      <div class="action-btn receive" onclick="showScreen('screen-bank-receive'); renderBankReceiveScreen();">
-        <span class="action-btn-icon">📥</span>
-        <span class="action-btn-label">Receber</span>
+      <div class="card">
+        <div class="row" style="justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
+          <span>Jogadores: <b id="term-player-count" style="color:var(--text);">0</b></span>
+          <span>Em circulação: <b id="term-total-circ" style="color:var(--text);">G$ 0</b></span>
+        </div>
+        <div id="term-players"></div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
-        <span>Jogadores: <b id="term-player-count" style="color:var(--text);">0</b></span>
-        <span>Em circulação: <b id="term-total-circ" style="color:var(--text);">G$ 0</b></span>
+    <div id="term-tab-operacao" class="term-tab" style="display:none;">
+      <div class="action-row">
+        <div class="action-btn pay" onclick="showScreen('screen-bank-pay'); renderBankPayScreen();">
+          <span class="action-btn-icon">💸</span>
+          <span class="action-btn-label">Pagar</span>
+        </div>
+        <div class="action-btn receive" onclick="showScreen('screen-bank-receive'); renderBankReceiveScreen();">
+          <span class="action-btn-icon">📥</span>
+          <span class="action-btn-label">Receber</span>
+        </div>
       </div>
-      <div id="term-players"></div>
-    </div>
 
-    <div class="card">
-      <b>📜 Extrato completo da partida</b>
-      <div id="term-log"></div>
-    </div>
+      <div class="card">
+        <b>📜 Extrato completo da partida</b>
+        <div id="term-log"></div>
+      </div>
 
-    <button class="btn btn-secondary" style="border-color:var(--red); color:var(--red);" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
+      <button class="btn btn-secondary" style="border-color:var(--red); color:var(--red);" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
+    </div>
   </div>
 
   <div class="screen" id="screen-bank-receive">
@@ -441,12 +449,18 @@ async function createRoomFlow(){
 let termKnownTxIds = null;
 async function enterTerminal(code){
   termKnownTxIds = null;
-  showScreen('screen-terminal');
+  showScreen('screen-terminal'); switchTermTab('jogadores');
   document.getElementById('term-code-pill').textContent = code;
   document.getElementById('term-qr-join').innerHTML = '';
   new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+code, width:190, height:190, correctLevel: QRCode.CorrectLevel.L });
   await refreshTerminal();
   clearInterval(pollTimer); pollTimer = setInterval(refreshTerminal, 2000);
+}
+function switchTermTab(tab){
+  document.getElementById('term-tab-jogadores').style.display = tab==='jogadores' ? '' : 'none';
+  document.getElementById('term-tab-operacao').style.display = tab==='operacao' ? '' : 'none';
+  document.getElementById('tabbtn-jogadores').classList.toggle('active', tab==='jogadores');
+  document.getElementById('tabbtn-operacao').classList.toggle('active', tab==='operacao');
 }
 function renderBankReceiveScreen(){ refreshTerminal(); }
 function renderBankPayScreen(){ refreshTerminal(); }
@@ -496,7 +510,11 @@ async function refreshTerminal(){
   if(termKnownTxIds === null){ termKnownTxIds = new Set(room.transactions.map(t=>t.id)); }
   else{
     const newReceived = room.transactions.find(t => !termKnownTxIds.has(t.id) && t.toId==='BANK');
-    if(newReceived) showSuccess('Cobrança recebida 💰 de ' + newReceived.fromName, 'var(--green)');
+    if(newReceived){
+      showSuccess('Cobrança recebida 💰 de ' + newReceived.fromName, 'var(--green)');
+      const cur = document.querySelector('.screen.active');
+      if(cur && (cur.id==='screen-bank-receive' || cur.id==='screen-bank-pay')) showScreen('screen-terminal');
+    }
     room.transactions.forEach(t=>termKnownTxIds.add(t.id));
   }
 }
@@ -522,6 +540,7 @@ async function bankConfirmPay(playerId){
   room.transactions.push({ id:genId(), fromId:'BANK', fromName:'Banco', toId:p.id, toName:p.name, amount, ts:Date.now() });
   p.pendingRequest = null; selectedBankPayTarget=null;
   await saveRoom(room); await refreshTerminal();
+  showScreen('screen-terminal');
   showSuccess('Pagamento enviado ✅ para ' + p.name, 'var(--red)');
 }
 async function resetGameFlow(){
@@ -598,7 +617,11 @@ async function refreshWallet(){
   if(walletKnownTxIds === null){ walletKnownTxIds = new Set(mine.map(t=>t.id)); }
   else{
     const newReceived = mine.find(t => !walletKnownTxIds.has(t.id) && t.toId===p.id);
-    if(newReceived) showSuccess('Pagamento recebido 💰 de ' + (newReceived.fromId==='BANK'?'Banco':newReceived.fromName), 'var(--green)');
+    if(newReceived){
+      showSuccess('Pagamento recebido 💰 de ' + (newReceived.fromId==='BANK'?'Banco':newReceived.fromName), 'var(--green)');
+      const cur = document.querySelector('.screen.active');
+      if(cur && (cur.id==='screen-receive' || cur.id==='screen-pay-pick' || cur.id==='screen-pay-confirm')) showScreen('screen-wallet');
+    }
     mine.forEach(t=>walletKnownTxIds.add(t.id));
   }
   const log = document.getElementById('wallet-log');
