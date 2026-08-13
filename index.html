@@ -136,10 +136,26 @@
   .boot-status{position:fixed; top:0; left:0; right:0; background:var(--accent); color:var(--bg); font-size:12px;
     text-align:center; padding:6px; z-index:999; display:none;}
   .pending-banner{background:var(--green-bg); border:1px solid var(--green-border); border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:13px;}
+  .success-overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    background:rgba(22,24,38,.92); opacity:0; pointer-events:none; transition:opacity .25s; z-index:500;}
+  .success-overlay.show{opacity:1; pointer-events:auto;}
+  .success-circle{width:84px; height:84px; border-radius:50%; border:3px solid var(--green); display:flex; align-items:center; justify-content:center;
+    transform:scale(.6); opacity:0; transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .3s, border-color .2s;}
+  .success-overlay.show .success-circle{transform:scale(1); opacity:1;}
+  .success-circle svg{width:40px; height:40px; color:var(--green);}
+  .success-circle path{stroke-dasharray:24; stroke-dashoffset:24; transition:stroke-dashoffset .4s ease .15s;}
+  .success-overlay.show .success-circle path{stroke-dashoffset:0;}
+  #success-message{font-size:16px; font-weight:700; color:var(--text);}
 </style>
 </head>
 <body>
 <div id="boot-status" class="boot-status">Conectando ao servidor…</div>
+<div id="success-overlay" class="success-overlay">
+  <div class="success-circle">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <div id="success-message"></div>
+</div>
 <div id="app">
 
   <div class="screen active" id="screen-home">
@@ -376,6 +392,17 @@ function genCode(){ const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c=""; 
 function genId(){ return Math.random().toString(36).slice(2,10); }
 function fmt(n){ return 'G$ ' + Math.round(n).toLocaleString('pt-BR'); }
 function ding(){ try{ if(navigator.vibrate) navigator.vibrate(35); }catch(e){} }
+let successTimer = null;
+function showSuccess(msg, color){
+  const ov = document.getElementById('success-overlay');
+  const circle = ov.querySelector('.success-circle');
+  document.getElementById('success-message').textContent = msg;
+  circle.style.borderColor = color; circle.querySelector('svg').style.color = color;
+  ov.classList.remove('show'); void ov.offsetWidth; ov.classList.add('show');
+  ding();
+  clearTimeout(successTimer);
+  successTimer = setTimeout(()=>{ ov.classList.remove('show'); }, 1700);
+}
 
 function getSession(){ try{ return JSON.parse(localStorage.getItem('bim-session')||'null'); }catch(e){ return null; } }
 function setSession(s){ localStorage.setItem('bim-session', JSON.stringify(s)); }
@@ -398,7 +425,9 @@ async function createRoomFlow(){
   }catch(e){ errEl.textContent = 'Não foi possível criar a partida. Verifique sua internet e tente de novo.'; }
   finally{ setBusy('create-btn', false, 'Criando…', 'Criar Partida'); }
 }
+let termKnownTxIds = null;
 async function enterTerminal(code){
+  termKnownTxIds = null;
   showScreen('screen-terminal'); switchTermTab('jogadores');
   document.getElementById('term-code-pill').textContent = code;
   document.getElementById('term-qr-join').innerHTML = '';
@@ -455,6 +484,12 @@ async function refreshTerminal(){
   const log = document.getElementById('term-log');
   const txs = [...room.transactions].reverse().slice(0,30);
   log.innerHTML = txs.length ? txs.map(t=>`<div class="tx"><span style="opacity:.8;">${t.fromId==='BANK'?'🏦 Banco':escapeHtml(t.fromName)} → ${t.toId==='BANK'?'🏦 Banco':escapeHtml(t.toName)}</span><span style="font-weight:700;color:var(--accent);white-space:nowrap;">${fmt(t.amount)}</span></div>`).join('') : '<div class="empty">Sem transações ainda</div>';
+  if(termKnownTxIds === null){ termKnownTxIds = new Set(room.transactions.map(t=>t.id)); }
+  else{
+    const newReceived = room.transactions.find(t => !termKnownTxIds.has(t.id) && t.toId==='BANK');
+    if(newReceived) showSuccess('Cobrança recebida 💰 de ' + newReceived.fromName, 'var(--green)');
+    room.transactions.forEach(t=>termKnownTxIds.add(t.id));
+  }
 }
 function bankSelectPayCandidate(id){ selectedBankPayTarget = id; refreshTerminal(); }
 function bankCancelPaySelection(){ selectedBankPayTarget = null; refreshTerminal(); }
@@ -476,8 +511,9 @@ async function bankConfirmPay(playerId){
   const amount = p.pendingRequest.amount;
   p.balance += amount;
   room.transactions.push({ id:genId(), fromId:'BANK', fromName:'Banco', toId:p.id, toName:p.name, amount, ts:Date.now() });
-  p.pendingRequest = null; ding(); selectedBankPayTarget=null;
+  p.pendingRequest = null; selectedBankPayTarget=null;
   await saveRoom(room); await refreshTerminal();
+  showSuccess('Pagamento enviado ✅ para ' + p.name, 'var(--red)');
 }
 async function resetGameFlow(){
   if(!confirm('Encerrar a partida e apagar todos os dados? Essa ação não pode ser desfeita.')) return;
@@ -535,7 +571,8 @@ async function finalizeJoin(){
 }
 
 /* ---------- Wallet ---------- */
-async function enterWallet(){ showScreen('screen-wallet'); await refreshWallet(); clearInterval(pollTimer); pollTimer=setInterval(refreshWallet,2000); }
+let walletKnownTxIds = null;
+async function enterWallet(){ walletKnownTxIds = null; showScreen('screen-wallet'); await refreshWallet(); clearInterval(pollTimer); pollTimer=setInterval(refreshWallet,2000); }
 async function refreshWallet(){
   const s = getSession(); if(!s || s.role!=='player') return;
   const room = await loadRoom(s.roomCode); if(!room) return;
@@ -547,6 +584,12 @@ async function refreshWallet(){
   if(p.pendingRequest){ banner.style.display=''; document.getElementById('wallet-pending-amount').textContent = fmt(p.pendingRequest.amount); }
   else banner.style.display='none';
   const mine = [...room.transactions].filter(t=>t.fromId===p.id || t.toId===p.id).reverse().slice(0,25);
+  if(walletKnownTxIds === null){ walletKnownTxIds = new Set(mine.map(t=>t.id)); }
+  else{
+    const newReceived = mine.find(t => !walletKnownTxIds.has(t.id) && t.toId===p.id);
+    if(newReceived) showSuccess('Pagamento recebido 💰 de ' + (newReceived.fromId==='BANK'?'Banco':newReceived.fromName), 'var(--green)');
+    mine.forEach(t=>walletKnownTxIds.add(t.id));
+  }
   const log = document.getElementById('wallet-log');
   log.innerHTML = mine.length ? mine.map(t=>{
     const out = t.fromId===p.id;
@@ -641,8 +684,9 @@ async function confirmPay(){
   if(targetId==='BANK') room.pendingRequest = null;
   else { const t = room.players.find(x=>x.id===targetId); t.balance += actualAmount; t.pendingRequest = null; }
   room.transactions.push({ id:genId(), fromId:me.id, fromName:me.name, toId:targetId, toName:pendingPayTarget.name, amount:actualAmount, ts:Date.now() });
-  ding(); await saveRoom(room);
+  await saveRoom(room);
   showScreen('screen-wallet'); await refreshWallet();
+  showSuccess('Pagamento enviado ✅', 'var(--red)');
 }
 
 /* ---------- Generic QR scanner ---------- */
