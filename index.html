@@ -216,56 +216,64 @@
       </div>
     </div>
 
-    <div class="seg">
-      <div class="seg-opt active" id="tabbtn-jogadores" onclick="switchTermTab('jogadores')">👥 Jogadores</div>
-      <div class="seg-opt" id="tabbtn-operacao" onclick="switchTermTab('operacao')">💰 Operação</div>
+    <div class="card center">
+      <div class="sub" style="margin-bottom:10px;">QR DE ENTRADA — o jogador escaneia pra se cadastrar na partida</div>
+      <div id="term-qr-join"></div>
     </div>
 
-    <div id="term-tab-jogadores" class="term-tab">
+    <div class="action-row">
+      <div class="action-btn pay" onclick="showScreen('screen-bank-pay'); renderBankPayScreen();">
+        <span class="action-btn-icon">💸</span>
+        <span class="action-btn-label">Pagar</span>
+      </div>
+      <div class="action-btn receive" onclick="showScreen('screen-bank-receive'); renderBankReceiveScreen();">
+        <span class="action-btn-icon">📥</span>
+        <span class="action-btn-label">Receber</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
+        <span>Jogadores: <b id="term-player-count" style="color:var(--text);">0</b></span>
+        <span>Em circulação: <b id="term-total-circ" style="color:var(--text);">G$ 0</b></span>
+      </div>
+      <div id="term-players"></div>
+    </div>
+
+    <div class="card">
+      <b>📜 Extrato completo da partida</b>
+      <div id="term-log"></div>
+    </div>
+
+    <button class="btn btn-secondary" style="border-color:var(--red); color:var(--red);" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
+  </div>
+
+  <div class="screen" id="screen-bank-receive">
+    <button class="btn btn-ghost" onclick="showScreen('screen-terminal')">‹ Voltar</button>
+    <h1>Cobrar de um jogador</h1>
+    <div id="term-charge-pending" style="display:none;">
+      <p class="sub">Mostre esse QR pra quem vai te pagar.</p>
       <div class="card center">
-        <div class="sub" style="margin-bottom:10px;">QR DE ENTRADA — o jogador escaneia pra se cadastrar na partida</div>
-        <div id="term-qr-join"></div>
-      </div>
-      <div class="card">
-        <div class="row" style="justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
-          <span>Jogadores: <b id="term-player-count" style="color:var(--text);">0</b></span>
-          <span>Em circulação: <b id="term-total-circ" style="color:var(--text);">G$ 0</b></span>
-        </div>
-        <div id="term-players"></div>
+        <div id="term-qr-charge" class="qr-box"></div>
+        <div style="font-size:28px;font-weight:800;color:var(--green);margin-top:12px;" id="term-charge-amount"></div>
+        <button class="btn btn-secondary" onclick="cancelBankCharge()" style="margin-top:16px;">Cancelar cobrança</button>
       </div>
     </div>
-
-    <div id="term-tab-operacao" class="term-tab" style="display:none;">
+    <div id="term-charge-form">
+      <p class="sub">Defina o valor que o banco quer receber.</p>
       <div class="card">
-        <b>📥 Cobrar de um jogador</b>
-        <p class="sub" style="margin:4px 0 10px;">Defina o valor e gere o QR pra ele escanear.</p>
-        <div id="term-charge-pending" style="display:none;">
-          <div class="center">
-            <div id="term-qr-charge" class="qr-box"></div>
-            <div style="font-size:24px;font-weight:800;color:var(--green);margin-top:10px;" id="term-charge-amount"></div>
-            <button class="btn btn-secondary" onclick="cancelBankCharge()" style="margin-top:12px;">Cancelar cobrança</button>
-          </div>
-        </div>
-        <div id="term-charge-form">
-          <input id="term-charge-input" type="number" placeholder="Valor (G$)">
-          <button class="btn btn-green" onclick="generateBankCharge()" style="margin-top:10px; padding:12px; font-size:14px;">Gerar QR de cobrança</button>
-        </div>
+        <label>Valor (G$)</label>
+        <input id="term-charge-input" type="number" inputmode="numeric" placeholder="0">
+        <button class="btn btn-green" onclick="generateBankCharge()" style="margin-top:14px;">Gerar QR</button>
       </div>
-
-      <div class="card">
-        <b>💸 Pagar a um jogador</b>
-        <p class="sub" style="margin:4px 0 10px;">Leia o QR de quem está cobrando.</p>
-        <div id="term-pay-selection" style="display:none;"></div>
-        <div id="term-pay-candidates"></div>
-      </div>
-
-      <div class="card">
-        <b>📜 Extrato completo da partida</b>
-        <div id="term-log"></div>
-      </div>
-
-      <button class="btn btn-secondary" style="border-color:var(--red); color:var(--red);" onclick="resetGameFlow()">Encerrar partida e apagar dados</button>
     </div>
+  </div>
+
+  <div class="screen" id="screen-bank-pay">
+    <button class="btn btn-ghost" onclick="showScreen('screen-terminal')">‹ Voltar</button>
+    <h1>Pagar a um jogador</h1>
+    <div id="term-pay-selection" style="display:none;"></div>
+    <div id="term-pay-candidates"></div>
   </div>
 
   <div class="screen" id="screen-wallet">
@@ -433,19 +441,15 @@ async function createRoomFlow(){
 let termKnownTxIds = null;
 async function enterTerminal(code){
   termKnownTxIds = null;
-  showScreen('screen-terminal'); switchTermTab('jogadores');
+  showScreen('screen-terminal');
   document.getElementById('term-code-pill').textContent = code;
   document.getElementById('term-qr-join').innerHTML = '';
   new QRCode(document.getElementById('term-qr-join'), { text: JOIN_PREFIX+code, width:190, height:190, correctLevel: QRCode.CorrectLevel.L });
   await refreshTerminal();
   clearInterval(pollTimer); pollTimer = setInterval(refreshTerminal, 2000);
 }
-function switchTermTab(tab){
-  document.getElementById('term-tab-jogadores').style.display = tab==='jogadores' ? '' : 'none';
-  document.getElementById('term-tab-operacao').style.display = tab==='operacao' ? '' : 'none';
-  document.getElementById('tabbtn-jogadores').classList.toggle('active', tab==='jogadores');
-  document.getElementById('tabbtn-operacao').classList.toggle('active', tab==='operacao');
-}
+function renderBankReceiveScreen(){ refreshTerminal(); }
+function renderBankPayScreen(){ refreshTerminal(); }
 async function refreshTerminal(){
   const s = getSession(); if(!s || s.role!=='terminal') return;
   const room = await loadRoom(s.roomCode); if(!room) return;
@@ -743,7 +747,6 @@ async function startScanner(){
 }
 function stopScanner(){ if(scanRAF) cancelAnimationFrame(scanRAF); if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } }
 function stopScanAndBack(){ stopScanner(); showScreen(scanMode==='join' ? 'screen-join-intro' : 'screen-pay-pick'); }
-
 /* ---------- Resume session ---------- */
 (async function init(){
   const s = getSession(); if(!s) return;
